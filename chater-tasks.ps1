@@ -9,10 +9,14 @@
 )
 
 # Configuration
-$TasksFile = Join-Path $PSScriptRoot "tasks.txt"
+$TasksFile = Join-Path $PSScriptRoot "helpers\tasks.txt"
 
 # Ensure tasks file exists
 if (-not (Test-Path $TasksFile)) {
+    $parentDir = Split-Path $TasksFile -Parent
+    if (-not (Test-Path $parentDir)) {
+        New-Item -Path $parentDir -ItemType Directory -Force | Out-Null
+    }
     New-Item -Path $TasksFile -ItemType File -Force | Out-Null
     Write-Host "Created new tasks file: $TasksFile" -ForegroundColor Green
 }
