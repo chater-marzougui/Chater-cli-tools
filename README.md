@@ -88,7 +88,7 @@ From AI-powered assistance and Git automation to system monitoring and port mana
 
 ---
 
-## Available Tools
+## 🧰 Available Tools
 
 | Tool | Description | Key Features |
 |------|-------------|--------------|
