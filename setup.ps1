@@ -130,20 +130,17 @@ function Update-FileContent {
     if ($content -ne $updatedContent) {
         Set-Content -Path $FilePath -Value $updatedContent -Encoding UTF8
         Write-Host "✅ Updated content in: $(Split-Path $FilePath -Leaf)" -ForegroundColor Green
-        return $true
     }
-    
-    return $false
 }
 
 function Rename-ScriptFiles {
     param([string]$NewUserName)
 
-    $scriptFiles = Get-ChildItem -Path $scriptDir -Filter "chater-*.ps1"
+    $scriptFiles = Get-ChildItem -Path $scriptDir -Filter "chater*.ps1"
     $renamedFiles = @()
     
     foreach ($file in $scriptFiles) {
-        $newName = $file.Name -replace "^chater-", "$NewUserName-"
+        $newName = $file.Name -replace "^chater", "$NewUserName"
         $newPath = Join-Path $file.DirectoryName $newName
         
         if (Test-Path $newPath) {
@@ -180,7 +177,7 @@ function Update-AllScriptContent {
 }
 
 function Copy-ScriptsToDestination {
-    $sourceDir = Get-Location
+    $sourceDir = $PSScriptRoot
     $destinationDir = $scriptDir
     
     Write-Host "📋 Copying files from $sourceDir to $destinationDir..." -ForegroundColor Blue
@@ -243,50 +240,13 @@ function Initialize-EnvFile {
         # Write updated content back to .env
         $updatedContent | Out-File -FilePath $envPath -Encoding UTF8
         Write-Host "✅ Updated .env with custom path: $PreferredPath" -ForegroundColor Green
-        return $PreferredPath
+        return
     }
     
     # Return current path from .env
     $currentPath = ($envContent | Where-Object { $_ -match "^MainScriptsPath=" }) -replace "MainScriptsPath=", ""
     if ($currentPath) {
         return $currentPath.Trim().Trim('"').Trim("'")
-    }
-    
-    return "C:\custom-scripts"
-}
-
-function Get-UserPreferences {
-    param([string]$ProvidedPath)
-    
-    if ($ProvidedPath) {
-        return $ProvidedPath
-    }
-    
-    Write-Host "📂 Directory Setup" -ForegroundColor Cyan
-    Write-Host "=================" -ForegroundColor Cyan
-    Write-Host ""
-    Write-Host "Default installation directory: C:\custom-scripts" -ForegroundColor Gray
-    Write-Host ""
-    Write-Host "Would you like to use a custom directory? (y/N): " -NoNewline -ForegroundColor Yellow
-    
-    $response = Read-Host
-    
-    if ($response -match "^[Yy]") {
-        Write-Host ""
-        Write-Host "Enter your preferred directory path: " -NoNewline -ForegroundColor Yellow
-        $customPath = Read-Host
-        
-        if ([string]::IsNullOrWhiteSpace($customPath)) {
-            Write-Host "⚠️  Using default path: C:\custom-scripts" -ForegroundColor Yellow
-            return "C:\custom-scripts"
-        }
-        
-        return $customPath.Trim().Trim('"').Trim("'")
-    } elseif ($response -match "^[Nn]") {
-        Write-Host "Enter your preferred directory path: " -NoNewline -ForegroundColor Yellow
-        $customPath = Read-Host
-        $scriptDir = $customPath.Trim().Trim('"').Trim("'")
-        return $scriptDir
     }
     
     return "C:\custom-scripts"
@@ -341,14 +301,15 @@ function Main {
     Write-Host "👤 Setting up scripts for user: $UserName" -ForegroundColor Green
     Write-Host ""
 
-    #Step 0: Initialize environment variables
-    $preferredPath = Get-UserPreferences -ProvidedPath $CustomPath
-    $actualScriptDir = Initialize-EnvFile -PreferredPath $preferredPath
-    $scriptDir = $actualScriptDir
-    
-    # Step 1: Create directories
-    Write-Host "📁 Step 1: Creating directories and moving files..." -ForegroundColor Blue
-    Create_Directories
+    #Step 0: Initialize Folders
+    $scriptDir = if ($CustomPath) { $CustomPath } else { $scriptDir }
+
+    Write-Host "📁 Step 0: Creating directories and env..." -ForegroundColor Blue
+    Create_Directories 
+    Initialize-EnvFile -PreferredPath $scriptDir
+
+    # Step 1: Copy scripts to destination
+    Write-Host "📁 Step 1: Copying scripts to destination..." -ForegroundColor Blue
     Copy-ScriptsToDestination
     Write-Host ""
 
