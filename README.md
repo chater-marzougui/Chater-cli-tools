@@ -40,7 +40,7 @@ Built with ❤️ by [Chater Marzougui](https://github.com/chater-marzougui).
 <details>
   <summary>Table of Contents</summary>
   <ol>
-    <li><a href="#-about-chater-cli-tools">About Chater CLI Tools</a></li>
+    <li><a href="#about-chater-cli-tools">About Chater CLI Tools</a></li>
     <li><a href="#-available-tools">Available Tools</a></li>
     <li><a href="#-quick-start">Quick Start</a></li>
     <li><a href="#-installation">Installation</a></li>
@@ -69,7 +69,7 @@ Built with ❤️ by [Chater Marzougui](https://github.com/chater-marzougui).
 
 From AI-powered assistance and Git automation to system monitoring and port management, these tools are built with simplicity and efficiency in mind. Each tool is self-contained, well-documented, and follows consistent naming conventions.
 
-### Key Features
+### 🎯 Key Features
 
 - 🔧 **11 Specialized Tools** covering development, system administration, and productivity
 - 🤖 **AI Integration** with Google Gemini for instant assistance
@@ -88,7 +88,7 @@ From AI-powered assistance and Git automation to system monitoring and port mana
 
 ---
 
-## 🛠️ Available Tools
+## Available Tools
 
 | Tool | Description | Key Features |
 |------|-------------|--------------|
@@ -199,7 +199,7 @@ cd C:\custom-scripts
 .\chater-adapt.ps1
 ```
 
-### Configuration
+### Config
 
 1. **Create environment file**:
 ```powershell
@@ -334,7 +334,7 @@ chater-ip -h             # Show help
 
 ---
 
-## ⚙️ Configuration
+## 🪛 Configuration
 
 ### Environment Variables
 The tools use a `.env` file for configuration:
