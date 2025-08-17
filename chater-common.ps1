@@ -8,8 +8,12 @@
     [switch]$Help
 )
 
-$commonScriptDir = "C:\custom-scripts\common-commands"
-$wrapperDir = "C:\custom-scripts\cmd-wrappers"
+
+$envFilePath = Join-Path $PSScriptRoot ".env"
+$scriptDir = (Get-Content $envFilePath | Where-Object { $_ -match "^MainScriptsPath=" }) -replace "MainScriptsPath=", ""
+if (-Not $scriptDir) { $scriptDir = "C:\custom-scripts" } else { $scriptDir = $scriptDir.Trim().Trim('"').Trim("'") }
+$commonScriptDir = "$scriptDir\common-commands"
+$wrapperDir = "$scriptDir\cmd-wrappers"
 
 function Show-Help {
     Write-Host ""

@@ -1,7 +1,4 @@
-﻿# PowerShell Task Manager
-# Usage: chater-tasks <command> [arguments] [options]
-# Made by Chater Marzougui
-param(
+﻿param(
     [Parameter(Position = 0)]
     [string]$Command,
 
@@ -12,7 +9,7 @@ param(
 )
 
 # Configuration
-$TasksFile = "C:\custom-scripts\tasks.txt"
+$TasksFile = Join-Path $PSScriptRoot "tasks.txt"
 
 # Ensure tasks file exists
 if (-not (Test-Path $TasksFile)) {
@@ -20,7 +17,7 @@ if (-not (Test-Path $TasksFile)) {
     Write-Host "Created new tasks file: $TasksFile" -ForegroundColor Green
 }
 
-function Parse-Arguments {
+function ParseArguments {
     param([string[]]$Args)
     
     $result = @{
@@ -131,7 +128,7 @@ function Format-TaskLine {
     return $taskLine
 }
 
-function Parse-TaskLine {
+function ParseTaskLine {
     param([string]$TaskLine)
     
     $task = @{
@@ -183,7 +180,7 @@ function Parse-TaskLine {
 function Add-Task {
     param([string[]]$Args)
     
-    $parsed = Parse-Arguments -Args $Arguments
+    $parsed = ParseArguments -Args $Arguments
 
     Write-Host $parsed.dueDate -ForegroundColor Green
 
@@ -231,7 +228,7 @@ function Add-Task {
     }
 }
 
-function Sort-Tasks {
+function SortTasks {
     param(
         [array]$Tasks,
         [string]$SortBy
@@ -259,7 +256,7 @@ function Sort-Tasks {
     }
 }
 
-function List-Tasks {
+function ListTasks {
     param([string[]]$Args)
     
     if (-not (Test-Path $TasksFile) -or (Get-Content $TasksFile).Count -eq 0) {
@@ -267,19 +264,19 @@ function List-Tasks {
         return
     }
     
-    $parsed = Parse-Arguments -Args $Args
+    $parsed = ParseArguments -Args $Args
     $taskLines = Get-Content $TasksFile
     $tasks = @()
     
     foreach ($line in $taskLines) {
         if (-not [string]::IsNullOrWhiteSpace($line)) {
-            $tasks += Parse-TaskLine -TaskLine $line
+            $tasks += ParseTaskLine -TaskLine $line
         }
     }
     
     # Sort tasks if requested
     if ($parsed.SortBy) {
-        $tasks = Sort-Tasks -Tasks $tasks -SortBy $parsed.SortBy
+        $tasks = SortTasks -Tasks $tasks -SortBy $parsed.SortBy
     }
     
     Write-Host "`nCurrent Tasks:" -ForegroundColor Cyan
@@ -342,7 +339,7 @@ function Complete-Task {
         $tasks[$taskIndex] = $task -replace '^\[ \]', '[x]'
         $tasks | Out-File -FilePath $TasksFile -Encoding UTF8
         
-        $parsedTask = Parse-TaskLine -TaskLine $tasks[$taskIndex]
+        $parsedTask = ParseTaskLine -TaskLine $tasks[$taskIndex]
         Write-Host "✅ Completed: $($parsedTask.Text)" -ForegroundColor Green
     } elseif ($task -match '^\[x\]') {
         Write-Host "Task $TaskNumber is already completed!" -ForegroundColor Yellow
@@ -351,7 +348,7 @@ function Complete-Task {
     }
 }
 
-function Uncomplete-Task {
+function UncompleteTask {
     param([int]$TaskNumber)
     
     if (-not (Test-Path $TasksFile)) {
@@ -373,7 +370,7 @@ function Uncomplete-Task {
         $tasks[$taskIndex] = $task -replace '[x]', ' '
         $tasks | Out-File -FilePath $TasksFile -Encoding UTF8
         
-        $parsedTask = Parse-TaskLine -TaskLine $tasks[$taskIndex]
+        $parsedTask = ParseTaskLine -TaskLine $tasks[$taskIndex]
         Write-Host "✅ Uncompleted: $($parsedTask.Text)" -ForegroundColor Green
     } elseif ($task -match '^\[ \]') {
         Write-Host "Task $TaskNumber is already Open!" -ForegroundColor Yellow
@@ -399,7 +396,7 @@ function Remove-Task {
     
     $taskIndex = $TaskNumber - 1
     $removedTaskLine = $tasks[$taskIndex]
-    $parsedTask = Parse-TaskLine -TaskLine $removedTaskLine
+    $parsedTask = ParseTaskLine -TaskLine $removedTaskLine
     
     # Remove the task
     $newTasks = $tasks | Where-Object { $_ -ne $removedTaskLine }
@@ -473,7 +470,7 @@ function Show-Stats {
     
     $tasks = @()
     foreach ($line in $taskLines) {
-        $tasks += Parse-TaskLine -TaskLine $line
+        $tasks += ParseTaskLine -TaskLine $line
     }
     
     $totalTasks = $tasks.Count
@@ -572,7 +569,7 @@ switch ($Command.ToLower()) {
         Add-Task -Args $Arguments
     }
     "list" {
-        List-Tasks -Args $Arguments
+        ListTasks -Args $Arguments
     }
     "complete" {
         if ($Arguments.Count -eq 0 -or -not [int]::TryParse($Arguments[0], [ref]$null)) {
@@ -595,7 +592,7 @@ switch ($Command.ToLower()) {
             Write-Host "Error: Please provide a valid task number" -ForegroundColor Red
             Write-Host "Usage: chater-tasks undo <task_number>"
         } else {
-            Uncomplete-Task -TaskNumber ([int]$Arguments[0])
+            UncompleteTask -TaskNumber ([int]$Arguments[0])
         }
     }
     "undone" {
@@ -603,7 +600,7 @@ switch ($Command.ToLower()) {
             Write-Host "Error: Please provide a valid task number" -ForegroundColor Red
             Write-Host "Usage: chater-tasks undone <task_number>"
         } else {
-            Uncomplete-Task -TaskNumber ([int]$Arguments[0])
+            UncompleteTask -TaskNumber ([int]$Arguments[0])
         }
     }
     "remove" {
@@ -654,6 +651,6 @@ switch ($Command.ToLower()) {
         Show-Help
     }
     default {
-        List-Tasks -Args $Arguments
+        ListTasks -Args $Arguments
     }
 }

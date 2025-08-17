@@ -1,4 +1,6 @@
-﻿$scriptDir = "C:\custom-scripts"
+﻿$envFilePath = Join-Path $PSScriptRoot ".env"
+$scriptDir = (Get-Content $envFilePath | Where-Object { $_ -match "^MainScriptsPath=" }) -replace "MainScriptsPath=", ""
+if (-Not $scriptDir) { $scriptDir = "C:\custom-scripts" } else { $scriptDir = $scriptDir.Trim().Trim('"').Trim("'") }
 
 # Resolve the current script path
 $currentScript = $MyInvocation.MyCommand.Path

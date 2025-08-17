@@ -22,9 +22,9 @@ function Show-Help {
     Write-Host "  without needing to specify the full PowerShell execution syntax."
     Write-Host ""
     Write-Host "USAGE:" -ForegroundColor Yellow
-    Write-Host "  .\chater-adapt                 # Run the adapter"
-    Write-Host "  .\chater-adapt -d <directory>  # Specify a directory"
-    Write-Host "  .\chater-adapt h               # Show this help message"
+    Write-Host "  chater-adapt                 # Run the adapter"
+    Write-Host "  chater-adapt -d <directory>  # Specify a directory"
+    Write-Host "  chater-adapt h               # Show this help message"
 }
 
 if ($Help -or $Command -eq "h" -or $Command -eq "-h") {
@@ -32,8 +32,10 @@ if ($Help -or $Command -eq "h" -or $Command -eq "-h") {
     return
 }
 
-$scriptDir = "C:\custom-scripts"
-$wrapperDir = "C:\custom-scripts\cmd-wrappers"
+$envFilePath = Join-Path $PSScriptRoot ".env"
+$scriptDir = (Get-Content $envFilePath | Where-Object { $_ -match "^MainScriptsPath=" }) -replace "MainScriptsPath=", ""
+if (-Not $scriptDir) { $scriptDir = "C:\custom-scripts" } else { $scriptDir = $scriptDir.Trim().Trim('"').Trim("'") }
+$wrapperDir = "$scriptDir\cmd-wrappers"
 $targetDir = if ($Directory) { $Directory } else { $scriptDir }
 
 function Adapt {

@@ -1,13 +1,20 @@
-param(
+﻿param(
     [Parameter(Position = 0)]
     [string]$UserName,
+
+    [Parameter(Position = 1)]
+    [string]$CustomPath,
 
     [switch]$Help
 )
 
-$GITHUB_LINK = "https://github.com/your-username/your-repo-name"
+$GITHUB_LINK = "https://github.com/chater-marzougui/Chater-cli-tools"
 $AUTHOR_CREDIT = "Made by Chater Marzougui"
 $STAR_MESSAGE = "please give a star at : $GITHUB_LINK"
+
+$envFilePath = Join-Path $PSScriptRoot ".env"
+$scriptDir = (Get-Content $envFilePath | Where-Object { $_ -match "^MainScriptsPath=" }) -replace "MainScriptsPath=", ""
+if (-Not $scriptDir) { $scriptDir = "C:\custom-scripts" } else { $scriptDir = $scriptDir.Trim().Trim('"').Trim("'") }
 
 function Show-Help {
     Write-Host ""
@@ -20,20 +27,22 @@ function Show-Help {
     Write-Host "  and configures the environment paths."
     Write-Host ""
     Write-Host "USAGE:" -ForegroundColor Yellow
-    Write-Host "  .\setup.ps1 <YourName>         # Setup with your name"
-    Write-Host "  .\setup.ps1 -Help              # Show this help message"
+    Write-Host "  .\setup.ps1 <YourName>                    # Setup with your name (interactive folder selection)"
+    Write-Host "  .\setup.ps1 <YourName> <CustomPath>       # Setup with your name and custom folder"
+    Write-Host "  .\setup.ps1 -Help                         # Show this help message"
     Write-Host ""
     Write-Host "EXAMPLES:" -ForegroundColor Yellow
-    Write-Host "  .\setup.ps1 john               # Setup scripts with 'john' prefix"
-    Write-Host "  .\setup.ps1 sarah              # Setup scripts with 'sarah' prefix"
+    Write-Host "  .\setup.ps1 john                          # Setup with interactive folder selection"
+    Write-Host "  .\setup.ps1 sarah D:\my-scripts           # Setup with custom folder"
+    Write-Host "  .\setup.ps1 alex 'C:\Program Files\Scripts'  # Setup with folder containing spaces"
     Write-Host ""
     Write-Host "WHAT THIS SCRIPT DOES:" -ForegroundColor Green
+    Write-Host "  0. Creates .env from example.env and configures paths"
     Write-Host "  1. Renames all 'chater-*.ps1' files to '<yourname>-*.ps1'"
     Write-Host "  2. Updates all file content to replace 'chater' with your name"
-    Write-Host "  3. Adds attribution comments to all files"
-    Write-Host "  4. Creates necessary directories"
-    Write-Host "  5. Adds script directories to your system PATH"
-    Write-Host "  6. Runs the adapter to create .cmd wrappers"
+    Write-Host "  3. Creates necessary directories"
+    Write-Host "  4. Adds script directories to your system PATH"
+    Write-Host "  5. Runs the adapter to create .cmd wrappers"
     Write-Host ""
     Write-Host "REQUIREMENTS:" -ForegroundColor Red
     Write-Host "  • Run as Administrator (required for PATH modification)"
@@ -63,11 +72,11 @@ function Add-ToPath {
     }
 }
 
-function Create-Directories {
+function Create_Directories {
     $directories = @(
-        "C:\custom-scripts",
-        "C:\custom-scripts\cmd-wrappers", 
-        "C:\custom-scripts\common-commands"
+        $scriptDir,
+        "$scriptDir\cmd-wrappers", 
+        "$scriptDir\common-commands"
     )
     
     foreach ($dir in $directories) {
@@ -103,7 +112,6 @@ function Add-Attribution {
     
     $newContent = $attribution + $content
     Set-Content -Path $FilePath -Value $newContent -Encoding UTF8
-    Write-Host "✅ Added attribution to: $(Split-Path $FilePath -Leaf)" -ForegroundColor Green
 }
 
 function Update-FileContent {
@@ -130,8 +138,8 @@ function Update-FileContent {
 
 function Rename-ScriptFiles {
     param([string]$NewUserName)
-    
-    $scriptFiles = Get-ChildItem -Path "." -Filter "chater-*.ps1"
+
+    $scriptFiles = Get-ChildItem -Path $scriptDir -Filter "chater-*.ps1"
     $renamedFiles = @()
     
     foreach ($file in $scriptFiles) {
@@ -160,22 +168,135 @@ function Update-AllScriptContent {
     param([string]$NewUserName)
     
     # Get all .ps1 files in current directory
-    $allScriptFiles = Get-ChildItem -Path "." -Filter "*.ps1" | Where-Object { $_.Name -ne "setup.ps1" }
-    
+    $allScriptFiles = Get-ChildItem -Path $scriptDir -Filter "*.ps1" | Where-Object { $_.Name -ne "setup.ps1" }
+
     foreach ($file in $allScriptFiles) {
         # Update content (replace chater with new name)
-        $contentUpdated = Update-FileContent -FilePath $file.FullName -OldName "chater" -NewName $NewUserName
+        Update-FileContent -FilePath $file.FullName -OldName "chater" -NewName $NewUserName
         
         # Add attribution
         Add-Attribution -FilePath $file.FullName -NewUserName $NewUserName
     }
 }
 
-function Run-Adapter {
+function Copy-ScriptsToDestination {
+    $sourceDir = Get-Location
+    $destinationDir = $scriptDir
+    
+    Write-Host "📋 Copying files from $sourceDir to $destinationDir..." -ForegroundColor Blue
+    
+    # Get all files except setup.ps1
+    $filesToCopy = Get-ChildItem -Path $sourceDir -File | Where-Object { $_.Name -ne "setup.ps1" }
+    
+    foreach ($file in $filesToCopy) {
+        $destPath = Join-Path $destinationDir $file.Name
+        try {
+            Copy-Item -Path $file.FullName -Destination $destPath -Force
+            Write-Host "✅ Copied: $($file.Name)" -ForegroundColor Green
+        }
+        catch {
+            Write-Host "❌ Failed to copy $($file.Name): $($_.Exception.Message)" -ForegroundColor Red
+        }
+    }
+}
+
+function Initialize-EnvFile {
+    param([string]$PreferredPath)
+    
+    $exampleEnvPath = Join-Path $PSScriptRoot "example.env"
+    $envPath = Join-Path $PSScriptRoot ".env"
+    
+    # Check if example.env exists
+    if (-not (Test-Path $exampleEnvPath)) {
+        Write-Host "❌ Error: example.env file not found" -ForegroundColor Red
+        return $null
+    }
+    
+    # Create .env from example.env if it doesn't exist
+    if (-not (Test-Path $envPath)) {
+        Copy-Item -Path $exampleEnvPath -Destination $envPath
+        Write-Host "✅ Created .env from example.env" -ForegroundColor Green
+    }
+    
+    # Read current .env content
+    $envContent = Get-Content $envPath
+    
+    # Update MainScriptsPath if provided
+    if ($PreferredPath) {
+        $updatedContent = @()
+        $pathUpdated = $false
+        
+        foreach ($line in $envContent) {
+            if ($line -match "^MainScriptsPath=") {
+                $updatedContent += "MainScriptsPath=$PreferredPath"
+                $pathUpdated = $true
+            } else {
+                $updatedContent += $line
+            }
+        }
+        
+        # If MainScriptsPath line wasn't found, add it
+        if (-not $pathUpdated) {
+            $updatedContent += "MainScriptsPath=$PreferredPath"
+        }
+        
+        # Write updated content back to .env
+        $updatedContent | Out-File -FilePath $envPath -Encoding UTF8
+        Write-Host "✅ Updated .env with custom path: $PreferredPath" -ForegroundColor Green
+        return $PreferredPath
+    }
+    
+    # Return current path from .env
+    $currentPath = ($envContent | Where-Object { $_ -match "^MainScriptsPath=" }) -replace "MainScriptsPath=", ""
+    if ($currentPath) {
+        return $currentPath.Trim().Trim('"').Trim("'")
+    }
+    
+    return "C:\custom-scripts"
+}
+
+function Get-UserPreferences {
+    param([string]$ProvidedPath)
+    
+    if ($ProvidedPath) {
+        return $ProvidedPath
+    }
+    
+    Write-Host "📂 Directory Setup" -ForegroundColor Cyan
+    Write-Host "=================" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "Default installation directory: C:\custom-scripts" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "Would you like to use a custom directory? (y/N): " -NoNewline -ForegroundColor Yellow
+    
+    $response = Read-Host
+    
+    if ($response -match "^[Yy]") {
+        Write-Host ""
+        Write-Host "Enter your preferred directory path: " -NoNewline -ForegroundColor Yellow
+        $customPath = Read-Host
+        
+        if ([string]::IsNullOrWhiteSpace($customPath)) {
+            Write-Host "⚠️  Using default path: C:\custom-scripts" -ForegroundColor Yellow
+            return "C:\custom-scripts"
+        }
+        
+        return $customPath.Trim().Trim('"').Trim("'")
+    } elseif ($response -match "^[Nn]") {
+        Write-Host "Enter your preferred directory path: " -NoNewline -ForegroundColor Yellow
+        $customPath = Read-Host
+        $scriptDir = $customPath.Trim().Trim('"').Trim("'")
+        return $scriptDir
+    }
+    
+    return "C:\custom-scripts"
+}
+
+function Run_Adapter {
     param([string]$NewUserName)
-    
-    $adapterScript = Get-ChildItem -Path "." -Filter "$NewUserName-adapt.ps1" -ErrorAction SilentlyContinue
-    
+
+    $adapterScript = Get-ChildItem -Path $scriptDir -Filter "$NewUserName-adapt.ps1" -ErrorAction SilentlyContinue
+
     if ($adapterScript) {
         Write-Host ""
         Write-Host "🔄 Running adapter to create .cmd wrappers..." -ForegroundColor Cyan
@@ -219,15 +340,21 @@ function Main {
     
     Write-Host "👤 Setting up scripts for user: $UserName" -ForegroundColor Green
     Write-Host ""
+
+    #Step 0: Initialize environment variables
+    $preferredPath = Get-UserPreferences -ProvidedPath $CustomPath
+    $actualScriptDir = Initialize-EnvFile -PreferredPath $preferredPath
+    $scriptDir = $actualScriptDir
     
     # Step 1: Create directories
-    Write-Host "📁 Step 1: Creating directories..." -ForegroundColor Blue
-    Create-Directories
+    Write-Host "📁 Step 1: Creating directories and moving files..." -ForegroundColor Blue
+    Create_Directories
+    Copy-ScriptsToDestination
     Write-Host ""
-    
+
     # Step 2: Rename script files
     Write-Host "📝 Step 2: Renaming script files..." -ForegroundColor Blue
-    $renamedFiles = Rename-ScriptFiles -NewUserName $UserName
+    Rename-ScriptFiles -NewUserName $UserName
     Write-Host ""
     
     # Step 3: Update all script content
@@ -239,9 +366,9 @@ function Main {
     Write-Host "🛣️  Step 4: Adding directories to PATH..." -ForegroundColor Blue
     $pathsAdded = 0
     $pathsToAdd = @(
-        "C:\custom-scripts",
-        "C:\custom-scripts\cmd-wrappers",
-        "C:\custom-scripts\common-commands"
+        "$scriptDir",
+        "$scriptDir\cmd-wrappers",
+        "$scriptDir\common-commands"
     )
     
     foreach ($path in $pathsToAdd) {
@@ -253,7 +380,7 @@ function Main {
     
     # Step 5: Run adapter
     Write-Host "⚙️  Step 5: Creating .cmd wrappers..." -ForegroundColor Blue
-    Run-Adapter -NewUserName $UserName
+    Run_Adapter -NewUserName $UserName
     Write-Host ""
     
     # Final summary

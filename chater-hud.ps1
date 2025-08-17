@@ -417,7 +417,7 @@ function Show-CyberHUD {
         $statusIcon = if($git.Status -eq "Clean") {"✅"} else {"⚡"}
 
         Write-Host " 🌿 [GIT] Branch: $($git.Branch) | Status: " -NoNewline -ForegroundColor Blue
-        Write-Host "$($git.Status)" -ForegroundColor $statusColor
+        Write-Host "$statusIcon $($git.Status)" -ForegroundColor $statusColor
         Write-Host "       |- Commits: $($git.Commits) | Last: $($git.LastCommit)" -ForegroundColor Gray
         if ($git.UncommittedChanges -gt 0) {
             Write-Host "       |- Uncommitted changes: $($git.UncommittedChanges)" -ForegroundColor Yellow
@@ -480,7 +480,7 @@ function Write-SystemLog {
 }
 
 # Alert system
-function Check-SystemAlerts {
+function CheckSystemAlerts {
     $cpu = Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average | Select-Object -ExpandProperty Average
     
     if ($cpu -gt $AlertThreshold.CPU) {
@@ -498,7 +498,7 @@ Write-SystemLog "System monitor started"
 try {
     while ($true) {
         Show-CyberHUD
-        Check-SystemAlerts
+        CheckSystemAlerts
         Start-Sleep -Seconds $RefreshRate
     }
 } catch [System.OperationCanceledException] {

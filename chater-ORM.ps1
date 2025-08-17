@@ -13,7 +13,10 @@ param(
     [string]$Directory
 )
 
-$scriptDir = "C:\custom-scripts"
+
+$envFilePath = Join-Path $PSScriptRoot ".env"
+$scriptDir = (Get-Content $envFilePath | Where-Object { $_ -match "^MainScriptsPath=" }) -replace "MainScriptsPath=", ""
+if (-Not $scriptDir) { $scriptDir = "C:\custom-scripts" } else { $scriptDir = $scriptDir.Trim().Trim('"').Trim("'") }
 
 function Show-Help {
     Write-Host ""
@@ -27,7 +30,7 @@ function Show-Help {
     Write-Host "  across different systems and editors."
     Write-Host ""
     Write-Host "USAGE:" -ForegroundColor Yellow
-    Write-Host "  .\chater-orm                   # Convert all .ps1 files in C:\custom-scripts"
+    Write-Host "  .\chater-orm                   # Convert all .ps1 files in $scriptDir"
     Write-Host "  .\chater-orm -d <directory>    # Convert all .ps1 files in target directory"
     Write-Host "  .\chater-orm h                 # Show this help message"
     Write-Host ""
@@ -91,7 +94,7 @@ foreach ($file in $filesToConvert) {
         $utf8WithBom = New-Object System.Text.UTF8Encoding $true
         [System.IO.File]::WriteAllText($file.FullName, $content, $utf8WithBom)
         
-        Write-Host "  ✓ Successfully converted: $($file.Name)" -ForegroundColor Green
+        Write-Host " ✅ Successfully converted: $($file.Name)" -ForegroundColor Green
     }
     catch {
         Write-Error "Failed to convert $($file.Name): $($_.Exception.Message)"
