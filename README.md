@@ -20,7 +20,7 @@ Built with ❤️ by [Chater Marzougui](https://github.com/chater-marzougui).
 <br />
 <div align="center">
   <a href="https://github.com/chater-marzougui/Chater-cli-tools">
-     <img src="https://raw.githubusercontent.com/chater-marzougui/Chater-cli-tools/main/images/cli-tools.svg" alt="CLI Tools Logo" width="256" height="256">
+     <img src="./helpers/cli-tools.svg" alt="CLI Tools Logo" width="256" height="256">
   </a>
   <h3>Chater CLI Tools</h3>
   <p align="center">
