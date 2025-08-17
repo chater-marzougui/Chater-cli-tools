@@ -46,6 +46,10 @@ function Adapt {
         exit 1
     }
 
+    if (-Not (Test-Path $wrapperDir)) {
+        New-Item -ItemType Directory -Path $wrapperDir -Force | Out-Null
+    }
+
     # Get all .ps1 files in the directory
     $ps1Files = Get-ChildItem -Path $targetDir -Filter "*.ps1"
 
