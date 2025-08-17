@@ -24,7 +24,7 @@ Built with ❤️ by [Chater Marzougui](https://github.com/chater-marzougui).
   </a>
   <h3>Chater CLI Tools</h3>
   <p align="center">
-    <strong>10 powerful CLI utilities in one package</strong>
+    <strong>11 powerful CLI utilities in one package</strong>
     <br />
     <br />
     <a href="https://github.com/chater-marzougui/Chater-cli-tools/issues/new?labels=bug&template=bug-report---.md">Report Bug</a>
@@ -63,15 +63,15 @@ Built with ❤️ by [Chater Marzougui](https://github.com/chater-marzougui).
 
 ---
 
-## 🚀 About Chater CLI Tools
+## About Chater CLI Tools
 
-**Chater CLI Tools** is a comprehensive collection of PowerShell utilities designed to streamline development workflows and system administration tasks. Whether you're a developer, system administrator, or power user, this toolkit provides essential commands to boost your productivity.
+**🚀 Chater CLI Tools** is a comprehensive collection of PowerShell utilities designed to streamline development workflows and system administration tasks. Whether you're a developer, system administrator, or power user, this toolkit provides essential commands to boost your productivity.
 
 From AI-powered assistance and Git automation to system monitoring and port management, these tools are built with simplicity and efficiency in mind. Each tool is self-contained, well-documented, and follows consistent naming conventions.
 
-### 🎯 Key Features
+### Key Features
 
-- 🔧 **10 Specialized Tools** covering development, system administration, and productivity
+- 🔧 **11 Specialized Tools** covering development, system administration, and productivity
 - 🤖 **AI Integration** with Google Gemini for instant assistance
 - ⚡ **Automated Workflows** for Git operations and script management
 - 📊 **System Monitoring** with cyberpunk-style HUD interface
@@ -103,6 +103,8 @@ From AI-powered assistance and Git automation to system monitoring and port mana
 | **🔄 chater-orm** | UTF-8 BOM converter | Ensures proper PowerShell script encoding |
 | **🌐 chater-port** | Port scanner and manager | Network diagnostics and process management |
 | **📝 chater-tasks** | Task management system | Priority-based todo list with due dates |
+| **📝 chater-ip** | Quick Public and Local ip check | So you don't search for them elsewhere |
+
 
 <div align="right">
   <a href="#readme-top">
@@ -312,6 +314,16 @@ chater-common -c 'git add . && git commit -m "Auto" && git push' -t gitpush
 chater-common -c cls -t c             # now writing c will run cls (shortcut)
 chater-common -l                      # List custom commands
 chater-common -rm gitpush             # Remove command
+```
+
+### ⚡ Custom Commands - `chater-ip`
+Check your local and public ip address.
+
+```powershell
+# Execute the command
+chater-ip                # show the two Ip addresses
+chater-ip -a             # show extended network analysis
+chater-ip -h             # Show help
 ```
 
 <div align="right">

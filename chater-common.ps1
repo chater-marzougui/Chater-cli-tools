@@ -78,13 +78,13 @@ function Create_Command {
 
 param(
     [Parameter(ValueFromRemainingArguments = `$true)]
-    [string[]]`$AdditionalArgs
+    [string[]]`$XtraArgs
 )
 
 # Original command with additional arguments support
 `$fullCommand = "$commandName"
-if (`$AdditionalArgs) {
-    `$fullCommand += " " + (`$AdditionalArgs -join " ")
+if (`$XtraArgs) {
+    `$fullCommand += " " + (`$XtraArgs -join " ")
 }
 
 Write-Host "Executing: `$fullCommand" -ForegroundColor Cyan
