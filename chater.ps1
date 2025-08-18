@@ -1,6 +1,9 @@
 ﻿param(
     [Parameter(Position=0)]
-    [string]$Command
+    [string]$Command,
+
+    [Parameter(ValueFromRemainingArguments=$true)]
+    [string[]]$Arguments
 )
 
 $envFilePath = Join-Path $PSScriptRoot ".env"
@@ -10,6 +13,7 @@ if (-Not $scriptDir) { $scriptDir = "C:\custom-scripts" } else { $scriptDir = $s
 # Resolve the current script path
 $currentScript = $MyInvocation.MyCommand.Path
 $currentScriptName = $MyInvocation.MyCommand.Name
+$smallHelp = $Arguments -contains "--small"
 
 # Ensure the directory exists
 if (-Not (Test-Path $scriptDir)) {
@@ -24,6 +28,22 @@ Write-Host ("=" * 60) -ForegroundColor Cyan
 Write-Host ""
 
 # Get all .ps1 files in the directory
+if ($Command.StartsWith("-")) {
+    switch ($Command) {
+        "--small" {
+            $smallHelp = $true
+            $Command = $null
+            if ($Arguments.Count -ge 1) {
+                $Command = $Arguments | Where-Object { -not $_.StartsWith("-") } | Select-Object -First 1
+            }
+        }
+        default {
+            Write-Error "Unknown command: $Command"
+            return
+        }
+    }
+}
+
 if ([string]::IsNullOrWhiteSpace($Command)) {
     $scripts = Get-ChildItem -Path $scriptDir -Filter "*.ps1" | Where-Object { $_.Name -ne "$currentScriptName" }
 } else {
@@ -50,7 +70,11 @@ $scripts | ForEach-Object {
     Write-Host "└─────────────────────────────────────────────────────────┘" -ForegroundColor Gray
     
     try {
-        & "$ps1Path" -h
+        if ($smallHelp) {
+            & "$ps1Path" -h --small
+        } else {
+            & "$ps1Path" -h
+        }
     } catch {
         Write-Host "❌ " -ForegroundColor Red -NoNewline
         Write-Warning "Error executing $baseName with -h: $_"

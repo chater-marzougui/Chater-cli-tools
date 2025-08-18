@@ -28,6 +28,9 @@ $ScriptsDir = Get-EnvVariable "MainScriptsPath"
 $HelpersDir = Join-Path $ScriptsDir "helpers"
 
 function Show-Help {
+    param (
+        [bool]$isSmall = $false
+    )
     Write-Host ""
     Write-Host "🌐 Local Server & Tunnel Manager" -ForegroundColor $Colors.Title
     Write-Host "================================" -ForegroundColor $Colors.Title
@@ -56,15 +59,17 @@ function Show-Help {
     Write-Host "  -d, --domain <domain>  Specify domain/subdomain" -ForegroundColor $Colors.Success
     Write-Host "  -lt-logs               Show LocalTunnel request logs" -ForegroundColor $Colors.Success
     Write-Host ""
-    Write-Host "EXAMPLES:" -ForegroundColor $Colors.Warning
-    Write-Host "  chater-serve 3000                          # Python server on port 3000" -ForegroundColor $Colors.Success
-    Write-Host "  chater-serve -p 8080 -d myapp tunnel       # LocalTunnel with flags" -ForegroundColor $Colors.Success
-    Write-Host "  chater-serve 8080 myapp --lt               # LocalTunnel shorthand" -ForegroundColor $Colors.Success
-    Write-Host "  chater-serve 5000 ngrok                    # Ngrok tunnel" -ForegroundColor $Colors.Success
-    Write-Host "  chater-serve 4000 myserver serveo          # Serveo tunnel" -ForegroundColor $Colors.Success
-    Write-Host "  chater-serve 3000 python ./dist            # Python server with directory" -ForegroundColor $Colors.Success
-    Write-Host "  chater-serve --setup tunnel                # Setup LocalTunnel" -ForegroundColor $Colors.Success
-    Write-Host ""
+    if (-not $isSmall) {
+        Write-Host "EXAMPLES:" -ForegroundColor $Colors.Warning
+        Write-Host "  chater-serve 3000                          # Python server on port 3000" -ForegroundColor $Colors.Success
+        Write-Host "  chater-serve -p 8080 -d myapp tunnel       # LocalTunnel with flags" -ForegroundColor $Colors.Success
+        Write-Host "  chater-serve 8080 myapp --lt               # LocalTunnel shorthand" -ForegroundColor $Colors.Success
+        Write-Host "  chater-serve 5000 ngrok                    # Ngrok tunnel" -ForegroundColor $Colors.Success
+        Write-Host "  chater-serve 4000 myserver serveo          # Serveo tunnel" -ForegroundColor $Colors.Success
+        Write-Host "  chater-serve 3000 python ./dist            # Python server with directory" -ForegroundColor $Colors.Success
+        Write-Host "  chater-serve --setup tunnel                # Setup LocalTunnel" -ForegroundColor $Colors.Success
+        Write-Host ""
+    }
     Write-Host "REQUIREMENTS:" -ForegroundColor $Colors.Warning
     Write-Host "  🐍 Python:      Built-in with Windows/most systems" -ForegroundColor $Colors.Info
     Write-Host "  🚇 LocalTunnel: Node.js + npm install -g localtunnel" -ForegroundColor $Colors.Info
@@ -324,12 +329,15 @@ function ParseArguments {
         IsSetup = $false
         SetupOption = $null
         ShowHelp = $false
+        ShowSmallHelp = $false
     }
 
     # Help check
     $helpArgs = @("-h", "--h", "help", "-help", "--help", "h")
-    if ($Arguments.Count -eq 0 -or ($Arguments.Count -eq 1 -and $Arguments[0].ToLower() -in $helpArgs)) {
+    if ($Arguments.Count -eq 0 -or ($Arguments.Count -le 2 -and $Arguments[0].ToLower() -in $helpArgs)) {
+        $isSmall = ($Arguments -contains "--small")
         $result.ShowHelp = $true
+        $result.ShowSmallHelp = $isSmall
         return $result
     }
     
@@ -400,7 +408,7 @@ function ParseArguments {
 $parsed = ParseArguments
 
 if ($parsed.ShowHelp) {
-    Show-Help
+    Show-Help -isSmall $parsed.ShowSmallHelp
     return
 }
 

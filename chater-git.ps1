@@ -9,6 +9,9 @@
 )
 
 function Show-Help {
+    param(
+        [bool]$isSmall = $false
+    )
     Write-Host "Git Automation Script" -ForegroundColor Green
     Write-Host "=====================" -ForegroundColor Green
     Write-Host ""
@@ -24,6 +27,9 @@ function Show-Help {
     Write-Host "  o          Push to origin"
     Write-Host "  h, -Help   Show this help message"
     Write-Host ""
+    if ($isSmall) {
+        return
+    }
     Write-Host "PARAMETERS:" -ForegroundColor Yellow
     Write-Host "  [message]  Commit message (first parameter)"
     Write-Host "  [branch]   Specify the branch name to push to"
@@ -34,8 +40,11 @@ function Show-Help {
     Write-Host "  chater-git ""Feature update"" o u origin"
 }
 
-if ($Help -or $Message -eq "h" -or $Message -eq "-h") {
-    Show-Help
+
+$helpArgs = @("-h", "--h", "help", "-Help")
+if ($Help -or $helpArgs -contains $Message) {
+    $isSmall = ($Arguments -contains "--small") -or $MainCommand -eq "--small"
+    Show-Help -isSmall $isSmall
     return
 }
 

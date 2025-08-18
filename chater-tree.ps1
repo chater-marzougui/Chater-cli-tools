@@ -11,6 +11,9 @@ $DefaultIgnored = @(
 )
 
 function Show-Help {
+    param(
+        [bool]$isSmall
+    )
     Write-Host ""
     Write-Host "Directory Tree Viewer" -ForegroundColor Cyan
     Write-Host "=====================" -ForegroundColor Cyan
@@ -32,14 +35,16 @@ function Show-Help {
     Write-Host "  chater-tree -size                   # Show file sizes" -ForegroundColor Green
     Write-Host "  chater-tree -h                      # Show this help message" -ForegroundColor Green
     Write-Host ""
-    Write-Host "EXAMPLES:" -ForegroundColor Yellow
-    Write-Host "  chater-tree C:\Projects\MyApp" -ForegroundColor Green
-    Write-Host "  chater-tree -d 3                    # Show only 3 levels deep" -ForegroundColor Green
-    Write-Host "  chater-tree -f -ext .js,.ts,.json   # Show only JS/TS/JSON files" -ForegroundColor Green
-    Write-Host "  chater-tree -dirs -d 2               # Show only directories, 2 levels" -ForegroundColor Green
-    Write-Host "  chater-tree -ignore cache,temp       # Ignore additional folders" -ForegroundColor Green
-    Write-Host "  chater-tree -all -size               # Show everything with file sizes" -ForegroundColor Green
-    Write-Host ""
+    if (-not $isSmall) {
+        Write-Host "EXAMPLES:" -ForegroundColor Yellow
+        Write-Host "  chater-tree C:\Projects\MyApp" -ForegroundColor Green
+        Write-Host "  chater-tree -d 3                    # Show only 3 levels deep" -ForegroundColor Green
+        Write-Host "  chater-tree -f -ext .js,.ts,.json   # Show only JS/TS/JSON files" -ForegroundColor Green
+        Write-Host "  chater-tree -dirs -d 2               # Show only directories, 2 levels" -ForegroundColor Green
+        Write-Host "  chater-tree -ignore cache,temp       # Ignore additional folders" -ForegroundColor Green
+        Write-Host "  chater-tree -all -size               # Show everything with file sizes" -ForegroundColor Green
+        Write-Host ""
+    }
     Write-Host "AUTO-IGNORED ITEMS:" -ForegroundColor Yellow
     Write-Host "  📁 Folders: node_modules, .git, bin, obj, dist, build, __pycache__, venv, etc."
     Write-Host "  📄 Files: *.log, *.pyc, *.class, Thumbs.db, .DS_Store, etc."
@@ -188,8 +193,11 @@ function Show-TreeStructure {
 }
 
 # Check for help
-if ($Arguments -contains "-h" -or $Arguments -contains "--help" -or $Arguments -contains "help" -or $Arguments -contains "-Help") {
-    Show-Help
+
+$helpArgs = @("-h", "--h", "help", "-Help")
+if ($Arguments | Where-Object { $helpArgs -contains $_ }) {
+    $isSmall = ($Arguments -contains "--small")
+    Show-Help -isSmall $isSmall
     return
 }
 

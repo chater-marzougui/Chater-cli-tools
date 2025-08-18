@@ -7,6 +7,9 @@ $functionStartTime = Get-Date
 
 # Help function
 function Show-Help {
+    param(
+        [bool]$isSmall = $false
+    )
     Write-Host ""
     Write-Host "Command Benchmark Tool" -ForegroundColor Cyan
     Write-Host "======================" -ForegroundColor Cyan
@@ -28,6 +31,9 @@ function Show-Help {
     Write-Host "  -s             Silent mode - suppress command output" -ForegroundColor White
     Write-Host "  -w             Warm up - run once before timing starts" -ForegroundColor White
     Write-Host ""
+    if ($isSmall) {
+        return
+    }
     Write-Host "EXAMPLES:" -ForegroundColor Yellow
     Write-Host "  chater-benchmark -n 5 `"chater-ask 'what is docker'`"" -ForegroundColor Green
     Write-Host "  chater-benchmark -n 10 `"ping google.com -n 1`"" -ForegroundColor Green
@@ -232,9 +238,11 @@ function Run_Benchmark {
     }
 }
 
+$helpArgs = @("-h", "--h", "help", "-Help")
 # Check for help
-if ($Arguments.Count -eq 0 -or ($Arguments.Count -eq 1 -and ($Arguments[0] -eq "-h" -or $Arguments[0] -eq "--h" -or $Arguments[0] -eq "help" -or $Arguments[0] -eq "-Help"))) {
-    Show-Help
+if ($Arguments.Count -eq 0 -or ($Arguments.Count -le 2 -and ($helpArgs -contains $Arguments[0]))) {
+    $isSmall = ($Arguments -contains "--small")
+    Show-Help -isSmall $isSmall
     return
 }
 

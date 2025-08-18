@@ -5,6 +5,9 @@
 
 # Help function
 function Show-Help {
+    param(
+        [bool]$isSmall = $false
+    )
     Write-Host ""
     Write-Host "Environment Variable Manager" -ForegroundColor Cyan
     Write-Host "============================" -ForegroundColor Cyan
@@ -22,6 +25,9 @@ function Show-Help {
     Write-Host "  chater-env -h                          # Show this help message" -ForegroundColor Green
     Write-Host "  chater-env help                        # Show this help message" -ForegroundColor Green
     Write-Host ""
+    if ($isSmall) {
+        return
+    }
     Write-Host "EXAMPLES:" -ForegroundColor Yellow
     Write-Host "  chater-env set API_KEY `"your-secret-key-here`"" -ForegroundColor Green
     Write-Host "  chater-env get API_KEY" -ForegroundColor Green
@@ -183,9 +189,12 @@ function Show-EnvVariables {
     Write-Host ""
 }
 
+
+$helpArgs = @("-h", "--h", "help", "-Help")
 # Check for help
-if ($Arguments.Count -eq 0 -or ($Arguments.Count -eq 1 -and ($Arguments[0] -eq "-h" -or $Arguments[0] -eq "--h" -or $Arguments[0] -eq "help" -or $Arguments[0] -eq "-Help"))) {
-    Show-Help
+if ($Arguments.Count -eq 0 -or ($Arguments.Count -le 2 -and ($helpArgs -contains $Arguments[0]))) {
+    $isSmall = ($Arguments -contains "--small")
+    Show-Help -isSmall $isSmall
     return
 }
 

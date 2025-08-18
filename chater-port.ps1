@@ -7,6 +7,9 @@ $functionStartTime = Get-Date
 
 # Help function
 function Show-Help {
+    param(
+        [bool]$isSmall = $false
+    )
     Write-Host ""
     Write-Host "Port Scanner and Process Manager" -ForegroundColor Cyan
     Write-Host "===============================" -ForegroundColor Cyan
@@ -25,6 +28,9 @@ function Show-Help {
     Write-Host "  chater-port -h                      # Show this help message" -ForegroundColor Green
     Write-Host "  chater-port help                    # Show this help message" -ForegroundColor Green
     Write-Host ""
+    if ($isSmall) {
+        return
+    }
     Write-Host "EXAMPLES:" -ForegroundColor Yellow
     Write-Host "  chater-port scan 3000-3010         # Scan development port range" -ForegroundColor Green
     Write-Host "  chater-port scan 8080               # Check if port 8080 is free" -ForegroundColor Green
@@ -300,8 +306,11 @@ function Show-CommonBusyPorts {
 }
 
 # Check for help
-if ($Arguments.Count -eq 0 -or ($Arguments.Count -eq 1 -and ($Arguments[0] -eq "-h" -or $Arguments[0] -eq "--h" -or $Arguments[0] -eq "help" -or $Arguments[0] -eq "-Help"))) {
-    Show-Help
+
+$helpArgs = @("-h", "--h", "help", "-Help")
+if ($Arguments.Count -eq 0 -or ($Arguments.Count -le 2 -and ($helpArgs -contains $Arguments[0]))) {
+    $isSmall = ($Arguments -contains "--small")
+    Show-Help -isSmall $isSmall
     return
 }
 

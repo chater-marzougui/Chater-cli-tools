@@ -526,6 +526,9 @@ function Show-Stats {
 }
 
 function Show-Help {
+    param(
+        [bool]$isSmall = $false
+    )
     Write-Host "`n📝 PowerShell Task Manager" -ForegroundColor Cyan
     Write-Host "===================================" -ForegroundColor Cyan
     Write-Host ""
@@ -546,24 +549,28 @@ function Show-Help {
     Write-Host "  -due, --due <date>       Set due date (YYYY-MM-DD)" -ForegroundColor White
     Write-Host "  --sort <criteria>        Sort tasks (priority, due, added)" -ForegroundColor White
     Write-Host ""
-    Write-Host "Examples:" -ForegroundColor Yellow
-    Write-Host "  chater-tasks add 'Buy groceries' -p high -due 2025-07-25" -ForegroundColor Gray
-    Write-Host "  chater-tasks add 'Call mom' -p medium" -ForegroundColor Gray
-    Write-Host "  chater-tasks list --sort priority" -ForegroundColor Gray
-    Write-Host "  chater-tasks list --sort due" -ForegroundColor Gray
-    Write-Host "  chater-tasks complete 1" -ForegroundColor Gray
-    Write-Host "  chater-tasks stats" -ForegroundColor Gray
-    Write-Host "  chater-tasks clear" -ForegroundColor Gray
-    Write-Host "  chater-tasks reset" -ForegroundColor Gray
-    Write-Host ""
+    if (-not $isSmall) {
+        Write-Host "Examples:" -ForegroundColor Yellow
+        Write-Host "  chater-tasks add 'Buy groceries' -p high -due 2025-07-25" -ForegroundColor Gray
+        Write-Host "  chater-tasks add 'Call mom' -p medium" -ForegroundColor Gray
+        Write-Host "  chater-tasks list --sort priority" -ForegroundColor Gray
+        Write-Host "  chater-tasks list --sort due" -ForegroundColor Gray
+        Write-Host "  chater-tasks complete 1" -ForegroundColor Gray
+        Write-Host "  chater-tasks stats" -ForegroundColor Gray
+        Write-Host "  chater-tasks clear" -ForegroundColor Gray
+        Write-Host "  chater-tasks reset" -ForegroundColor Gray
+        Write-Host ""
+    }
     Write-Host "Priority Icons:" -ForegroundColor Yellow
     Write-Host "  🔴 High    🟡 Medium    🟢 Low    ⚪ Normal" -ForegroundColor White
     Write-Host ""
 }
 
 
-if ($Help -or $Command -eq "h" -or $Command -eq "-h") {
-    Show-Help
+$helpArgs = @("-h", "--h", "help", "-Help")
+if ($Help -or $helpArgs -contains $Command) {
+    $isSmall = ($Arguments -contains "--small") -or $Command -eq "--small"
+    Show-Help -isSmall $isSmall
     return
 }
 

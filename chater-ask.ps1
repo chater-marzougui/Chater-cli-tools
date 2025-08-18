@@ -7,6 +7,9 @@ $modelName = "gemini-2.5-flash-lite"
 
 # Help function
 function Show-Help {
+    param(
+        [bool]$isSmall = $false
+    )
     Write-Host ""
     Write-Host "AI Assistant - Gemini Chat Interface" -ForegroundColor Cyan
     Write-Host "====================================" -ForegroundColor Cyan
@@ -24,6 +27,9 @@ function Show-Help {
     Write-Host "  chater-ask `"your question`" --f         # Use gemini-2.5-flash model" -ForegroundColor Green
     Write-Host "  chater-ask `"your question`" --m <name>  # Use another model" -ForegroundColor Green
     Write-Host ""
+    if ($isSmall) {
+        return
+    }
     Write-Host "EXAMPLES:" -ForegroundColor Yellow
     Write-Host "  chater-ask `"What is the difference between PowerShell and CMD?`"" -ForegroundColor Green
     Write-Host "  chater-ask what are the best practices for API design" -ForegroundColor Green
@@ -109,9 +115,9 @@ Question: $Question
 
 # Check for help
 $helpArgs = @("-h", "--h", "help", "-Help")
-
-if ($Arguments.Count -eq 0 -or ($Arguments.Count -eq 1 -and $helpArgs -contains $Arguments[0])) {
-    Show-Help
+if ($Arguments.Count -eq 0 -or ($Arguments.Count -le 2 -and $helpArgs -contains $Arguments[0])) {
+    $isSmall = ($Arguments -contains "--small")
+    Show-Help -isSmall $isSmall
     return
 }
 

@@ -16,6 +16,9 @@ $commonScriptDir = "$scriptDir\common-commands"
 $wrapperDir = "$scriptDir\cmd-wrappers"
 
 function Show-Help {
+    param(
+        [bool]$isSmall = $false
+    )
     Write-Host ""
     Write-Host "PowerShell Script Maker" -ForegroundColor Green
     Write-Host "==============================" -ForegroundColor Green
@@ -31,6 +34,10 @@ function Show-Help {
     Write-Host "  chater-common -u <command>              # Edit the script for the specified command"
     Write-Host "  chater-common h                         # Show this help message"
     Write-Host ""
+    if ($isSmall) {
+        List_Commands
+        return
+    }
     Write-Host "EXAMPLES:" -ForegroundColor Yellow
     Write-Host "  chater-common -c gitpush -t 'git add . && git commit -m ""Auto commit"" && git push'"
     Write-Host "  chater-common -c deploy -t 'docker build -t myapp . && docker run -p 8080:80 myapp'"
@@ -213,8 +220,11 @@ function Edit-Command {
 }
 
 # Main script logic
-if ($Help -or $MainCommand -eq "h" -or $MainCommand -eq "-h") {
-    Show-Help
+
+$helpArgs = @("-h", "--h", "help", "-Help")
+if ($Help -or $helpArgs -contains $MainCommand) {
+    $isSmall = ($Arguments -contains "--small") -or $MainCommand -eq "--small"
+    Show-Help -isSmall $isSmall
     return
 }
 

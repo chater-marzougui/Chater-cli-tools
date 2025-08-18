@@ -19,6 +19,9 @@ $scriptDir = (Get-Content $envFilePath | Where-Object { $_ -match "^MainScriptsP
 if (-Not $scriptDir) { $scriptDir = "C:\custom-scripts" } else { $scriptDir = $scriptDir.Trim().Trim('"').Trim("'") }
 
 function Show-Help {
+    param(
+        [bool]$isSmall = $false
+    )
     Write-Host ""
     Write-Host "PowerShell UTF-8 BOM Converter" -ForegroundColor Green
     Write-Host "==============================" -ForegroundColor Green
@@ -34,6 +37,9 @@ function Show-Help {
     Write-Host "  chater-orm -d <directory>    # Convert all .ps1 files in target directory"
     Write-Host "  chater-orm h                 # Show this help message"
     Write-Host ""
+    if ($isSmall) {
+        return
+    }
     Write-Host "WHAT IS BOM (Byte Order Mark)?" -ForegroundColor Yellow
     Write-Host "  • A special marker at the beginning of text files"
     Write-Host "  • Identifies the encoding format (UTF-8, UTF-16, etc.)"
@@ -42,8 +48,11 @@ function Show-Help {
     Write-Host "  • Essential for PowerShell scripts with non-ASCII characters"
 }
 
-if ($Help -or $Command -eq "h" -or $Command -eq "-h") {
-    Show-Help
+
+$helpArgs = @("-h", "--h", "help", "-Help")
+if ($Help -or $helpArgs -contains $Command) {
+    $isSmall = ($Arguments -contains "--small") -or $Command -eq "--small"
+    Show-Help -isSmall $isSmall
     return
 }
 
