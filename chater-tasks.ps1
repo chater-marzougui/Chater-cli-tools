@@ -574,6 +574,10 @@ if ($Help -or $helpArgs -contains $Command) {
     return
 }
 
+$completedCommands = @("complete", "done", "do")
+$unCompletedCommands = @("undone", "undo")
+$removeCommands = @("remove", "delete", "rm", "del")
+
 # Main command processing
 switch ($Command.ToLower()) {
     "add" {
@@ -582,7 +586,7 @@ switch ($Command.ToLower()) {
     "list" {
         ListTasks -Args $Arguments
     }
-    "complete" {
+    {$_ -in $completedCommands} {
         if ($Arguments.Count -eq 0 -or -not [int]::TryParse($Arguments[0], [ref]$null)) {
             Write-Host "Error: Please provide a valid task number" -ForegroundColor Red
             Write-Host "Usage: chater-tasks complete <task_number>"
@@ -590,15 +594,7 @@ switch ($Command.ToLower()) {
             Complete-Task -TaskNumber ([int]$Arguments[0])
         }
     }
-    "done" {
-        if ($Arguments.Count -eq 0 -or -not [int]::TryParse($Arguments[0], [ref]$null)) {
-            Write-Host "Error: Please provide a valid task number" -ForegroundColor Red
-            Write-Host "Usage: chater-tasks done <task_number>"
-        } else {
-            Complete-Task -TaskNumber ([int]$Arguments[0])
-        }
-    }
-    "undo" {
+    {$_ -in $unCompletedCommands} {
         if ($Arguments.Count -eq 0 -or -not [int]::TryParse($Arguments[0], [ref]$null)) {
             Write-Host "Error: Please provide a valid task number" -ForegroundColor Red
             Write-Host "Usage: chater-tasks undo <task_number>"
@@ -606,42 +602,10 @@ switch ($Command.ToLower()) {
             UncompleteTask -TaskNumber ([int]$Arguments[0])
         }
     }
-    "undone" {
-        if ($Arguments.Count -eq 0 -or -not [int]::TryParse($Arguments[0], [ref]$null)) {
-            Write-Host "Error: Please provide a valid task number" -ForegroundColor Red
-            Write-Host "Usage: chater-tasks undone <task_number>"
-        } else {
-            UncompleteTask -TaskNumber ([int]$Arguments[0])
-        }
-    }
-    "remove" {
+    {$_ -in $removeCommands} {
         if ($Arguments.Count -eq 0 -or -not [int]::TryParse($Arguments[0], [ref]$null)) {
             Write-Host "Error: Please provide a valid task number" -ForegroundColor Red
             Write-Host "Usage: chater-tasks remove <task_number>"
-        } else {
-            Remove-Task -TaskNumber ([int]$Arguments[0])
-        }
-    }
-    "delete" {
-        if ($Arguments.Count -eq 0 -or -not [int]::TryParse($Arguments[0], [ref]$null)) {
-            Write-Host "Error: Please provide a valid task number" -ForegroundColor Red
-            Write-Host "Usage: chater-tasks delete <task_number>"
-        } else {
-            Remove-Task -TaskNumber ([int]$Arguments[0])
-        }
-    }
-    "rm" {
-        if ($Arguments.Count -eq 0 -or -not [int]::TryParse($Arguments[0], [ref]$null)) {
-            Write-Host "Error: Please provide a valid task number" -ForegroundColor Red
-            Write-Host "Usage: chater-tasks rm <task_number>"
-        } else {
-            Remove-Task -TaskNumber ([int]$Arguments[0])
-        }
-    }
-    "del" {
-        if ($Arguments.Count -eq 0 -or -not [int]::TryParse($Arguments[0], [ref]$null)) {
-            Write-Host "Error: Please provide a valid task number" -ForegroundColor Red
-            Write-Host "Usage: chater-tasks del <task_number>"
         } else {
             Remove-Task -TaskNumber ([int]$Arguments[0])
         }
@@ -654,12 +618,6 @@ switch ($Command.ToLower()) {
     }
     "stats" {
         Show-Stats
-    }
-    "help" {
-        Show-Help
-    }
-    "h" {
-        Show-Help
     }
     default {
         ListTasks -Args $Arguments

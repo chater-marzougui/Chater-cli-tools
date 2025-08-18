@@ -185,6 +185,26 @@ function Setup-Ngrok {
     }
 }
 
+function Get-LocalIP {
+    # Prefer Wi-Fi or Ethernet, ignore virtual adapters
+    $adapter = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+               Where-Object { 
+                   $_.IPAddress -notlike "169.*" -and 
+                   $_.IPAddress -ne "127.0.0.1" -and 
+                   $_.InterfaceAlias -notlike "vEthernet*" -and
+                   $_.InterfaceAlias -notlike "Loopback*" -and
+                   $_.InterfaceAlias -notlike "*Virtual*" 
+               } |
+               Sort-Object InterfaceMetric |
+               Select-Object -First 1
+
+    if ($adapter) {
+        return $adapter.IPAddress
+    } else {
+        Write-Host "❌ Could not retrieve local IPv4." -ForegroundColor Red
+    }
+}
+
 function Start-PythonServer {
     param([string]$Port, [string]$Subdomain, [string]$Directory)
     
@@ -195,12 +215,14 @@ function Start-PythonServer {
     Write-Host "🐍 Starting Python HTTP Server on port $Port..." -ForegroundColor $Colors.Info
     Write-Host "📂 Serving files from: $Directory" -ForegroundColor $Colors.Info
     Write-Host "🌐 Local URL: http://localhost:$Port" -ForegroundColor $Colors.Highlight
+    Write-Host "🌐 Local IP URL: http://$(Get-LocalIP):$Port" -ForegroundColor $Colors.Highlight
     Write-Host "🛑 Press Ctrl+C to stop" -ForegroundColor $Colors.Warning
     Write-Host ""
     
     try {
         if (Test-Command "python") {
             python -m http.server $Port --directory $Directory
+            Write-Host "✅ Python server started successfully!" -ForegroundColor $Colors.Success
         }
         elseif (Test-Command "python3") {
             python3 -m http.server $Port --directory $Directory

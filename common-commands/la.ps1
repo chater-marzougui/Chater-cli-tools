@@ -1,7 +1,7 @@
-﻿# Auto-generated script for: ip
-# Original command: chater-ip
+﻿# Auto-generated script for: la
+# Original command: npm run admin
 # Generated on: 2025-08-19 00:38:20
 
 # Original command with additional arguments support
-$fullCommand = "chater-ip"
+$fullCommand = "npm run admin"
 & $fullCommand @args

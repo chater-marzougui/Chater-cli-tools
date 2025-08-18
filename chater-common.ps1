@@ -1,13 +1,4 @@
-﻿param(
-    [Parameter(Position = 0)]
-    [string]$MainCommand,
-
-    [Parameter(ValueFromRemainingArguments = $true)]
-    [string[]]$Arguments,
-
-    [switch]$Help
-)
-
+﻿$Arguments = $args
 
 $envFilePath = Join-Path $PSScriptRoot ".env"
 $scriptDir = (Get-Content $envFilePath | Where-Object { $_ -match "^MainScriptsPath=" }) -replace "MainScriptsPath=", ""
@@ -83,19 +74,9 @@ function Create_Command {
 # Original command: $commandName
 # Generated on: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
 
-param(
-    [Parameter(ValueFromRemainingArguments = `$true)]
-    [string[]]`$XtraArgs
-)
-
 # Original command with additional arguments support
 `$fullCommand = "$commandName"
-if (`$XtraArgs) {
-    `$fullCommand += " " + (`$XtraArgs -join " ")
-}
-
-Write-Host "Executing: `$fullCommand" -ForegroundColor Cyan
-Invoke-Expression `$fullCommand
+& `$fullCommand @args
 "@
 
     try {
@@ -222,8 +203,8 @@ function Edit-Command {
 # Main script logic
 
 $helpArgs = @("-h", "--h", "help", "-Help")
-if ($Help -or $helpArgs -contains $MainCommand) {
-    $isSmall = ($Arguments -contains "--small") -or $MainCommand -eq "--small"
+if ($helpArgs -contains $Arguments[0]) {
+    $isSmall = ($Arguments -contains "--small")
     Show-Help -isSmall $isSmall
     return
 }
@@ -232,7 +213,6 @@ if ($Help -or $helpArgs -contains $MainCommand) {
 $action = $null
 $commandName = $null
 $targetCommand = $null
-Write-Host "Parsing arguments: $Arguments" -ForegroundColor Cyan
 
 for ($i = 0; $i -lt $Arguments.Length; $i++) {
     switch ($Arguments[$i]) {
@@ -250,7 +230,7 @@ for ($i = 0; $i -lt $Arguments.Length; $i++) {
                 $i++
             }
         }
-        "-l" {
+        { $_ -in @("-l", "list") } {
             $action = "list"
         }
         "-rm" {
@@ -267,20 +247,13 @@ for ($i = 0; $i -lt $Arguments.Length; $i++) {
                 $i++
             }
         }
-        default {
-            # Handle cases where command might be first argument
-            if ($null -eq $action -and $null -eq $commandName) {
-                if ($Arguments[$i] -eq "-l") {
-                    $action = "list"
-                } elseif ($Arguments[$i].StartsWith("-")) {
-                    # Skip flags we don't recognize
-                } else {
-                    # Might be a command name for listing specific command
-                    $commandName = $Arguments[$i]
-                }
-            }
-        }
     }
+}
+
+if ($Arguments.Count -eq 2 -and $null -eq $action) {
+    $action = "create"
+    $commandName = $Arguments[0]
+    $targetCommand = $Arguments[1]
 }
 
 # Execute based on action
@@ -298,11 +271,7 @@ switch ($action) {
         Edit-Command -targetCommand $targetCommand
     }
     default {
-        if ([string]::IsNullOrWhiteSpace($MainCommand) -and $Arguments.Length -eq 0) {
-            Show-Help
-        } else {
-            Write-Host "Invalid usage. Use -h for help." -ForegroundColor Red
-            Show-Help
-        }
+        Write-Host "Invalid usage. Use -h for help." -ForegroundColor Red
+        Show-Help
     }
 }
