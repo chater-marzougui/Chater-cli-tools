@@ -75,8 +75,9 @@ function Add-ToPath {
 function Create_Directories {
     $directories = @(
         $scriptDir,
-        "$scriptDir\cmd-wrappers", 
-        "$scriptDir\common-commands"
+        "$scriptDir\cmd-wrappers",
+        "$scriptDir\common-commands",
+        "$scriptDir\helpers"
     )
     
     foreach ($dir in $directories) {
@@ -329,7 +330,8 @@ function Main {
     $pathsToAdd = @(
         "$scriptDir",
         "$scriptDir\cmd-wrappers",
-        "$scriptDir\common-commands"
+        "$scriptDir\common-commands",
+        "$scriptDir\helpers"
     )
     
     foreach ($path in $pathsToAdd) {

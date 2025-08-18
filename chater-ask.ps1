@@ -108,7 +108,9 @@ Question: $Question
 }
 
 # Check for help
-if ($Arguments.Count -eq 0 -or ($Arguments.Count -eq 1 -and ($Arguments[0] -eq "-h" -or $Arguments[0] -eq "--h" -or $Arguments[0] -eq "help" -or $Arguments[0] -eq "-Help"))) {
+$helpArgs = @("-h", "--h", "help", "-Help")
+
+if ($Arguments.Count -eq 0 -or ($Arguments.Count -eq 1 -and $helpArgs -contains $Arguments[0])) {
     Show-Help
     return
 }
