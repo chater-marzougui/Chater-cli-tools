@@ -101,8 +101,10 @@ From AI-powered assistance and Git automation to system monitoring and port mana
 | **📦 chater-git** | Git workflow automation | Streamlined add, commit, and push operations |
 | **📊 chater-hud** | System monitoring dashboard | Real-time system vitals with cyberpunk aesthetics |
 | **🔄 chater-orm** | UTF-8 BOM converter | Ensures proper PowerShell script encoding |
-| **🌐 chater-port** | Port scanner and manager | Network diagnostics and process management |
+| **🌐 chater-port** | Port scanner and manager and task killer | Network diagnostics and process management |
+| **✈️ chater-serve**| Port forwarding tool | Make your local project accessible globbaly with diff options | 
 | **📝 chater-tasks** | Task management system | Priority-based todo list with due dates |
+| **🌲 chater-tree**| Shows folders tree | With filters, files to ignore, colors and icons |
 | **📝 chater-ip** | Quick Public and Local ip check | So you don't search for them elsewhere |
 
 
@@ -316,7 +318,7 @@ chater-common -l                      # List custom commands
 chater-common -rm gitpush             # Remove command
 ```
 
-### ⚡ Custom Commands - `chater-ip`
+### 🌐 Show IP - `chater-ip`
 Check your local and public ip address.
 
 ```powershell
@@ -324,6 +326,37 @@ Check your local and public ip address.
 chater-ip                # show the two Ip addresses
 chater-ip -a             # show extended network analysis
 chater-ip -h             # Show help
+```
+### 🌐 Local Server & Tunnel Manager - `chater-serve`
+Serve local content and expose it to the internet with multiple tunneling options.
+```powershell
+# Local Python server
+chater-serve 3000                          # Python server on port 3000
+chater-serve 3000 python ./dist            # Serve specific directory
+
+# Tunneling services
+chater-serve 8080 myapp tunnel             # LocalTunnel with custom subdomain
+chater-serve 8080 myapp --lt               # LocalTunnel shorthand
+chater-serve 5000 ngrok                    # Ngrok secure tunnel
+chater-serve 4000 myserver serveo          # Serveo SSH tunnel
+
+# With flags
+chater-serve -p 8080 -d myapp tunnel       # Using port and domain flags
+chater-serve --setup tunnel                # Setup specific service
+```
+### 🌳 Directory Tree Viewer - `chater-tree`
+Display visual tree structure of directories and files with smart filtering.
+```powershell
+# Basic usage
+chater-tree                                # Current directory tree
+chater-tree C:\Projects\MyApp              # Specific path
+chater-tree -d 3                          # Limit to 3 levels deep
+
+# Filtering options
+chater-tree -f -ext .js,.ts,.json         # Show only JS/TS/JSON files
+chater-tree -dirs -d 2                    # Directories only, 2 levels
+chater-tree -ignore cache,temp            # Add custom ignore patterns
+chater-tree -all -size                    # Show everything with file sizes
 ```
 
 <div align="right">
@@ -333,7 +366,6 @@ chater-ip -h             # Show help
 </div>
 
 ---
-
 ## 🪛 Configuration
 
 ### Environment Variables
@@ -407,6 +439,9 @@ param(
 )
 
 function Show-Help {
+    param(
+      [bool] isSmall = $false
+    )
     Write-Host "Your Custom Tool" -ForegroundColor Cyan
     Write-Host "================" -ForegroundColor Cyan
     Write-Host ""
@@ -416,10 +451,17 @@ function Show-Help {
     Write-Host "USAGE:" -ForegroundColor Yellow
     Write-Host "  yourname-newtool <command>    # Your command usage"
     Write-Host ""
+    if(-not $isSmall) {
+      Write-Host "EXAMPLES:" -ForegroundColor Yellow
+      Write-Host "  yourname-newtool <command>    # An example of the command"
+      Write-Host ""
+    }
 }
 
-if ($Help -or $MainCommand -eq "h") {
-    Show-Help
+$helpArgs = @("-h", "--h", "help", "-Help")
+if ($help -or $Arguments | Where-Object { $helpArgs -contains $_ } -or $helpArgs -contains $MainCommand) {
+    $isSmall = ($Arguments -contains "--small") -or $MainCommand -eq "--small"
+    Show-Help -isSmall $isSmall
     return
 }
 
