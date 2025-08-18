@@ -30,9 +30,9 @@ function Show-Help {
     Write-Host "  across different systems and editors."
     Write-Host ""
     Write-Host "USAGE:" -ForegroundColor Yellow
-    Write-Host "  .\chater-orm                   # Convert all .ps1 files in $scriptDir"
-    Write-Host "  .\chater-orm -d <directory>    # Convert all .ps1 files in target directory"
-    Write-Host "  .\chater-orm h                 # Show this help message"
+    Write-Host "  chater-orm                   # Convert all .ps1 files in $scriptDir"
+    Write-Host "  chater-orm -d <directory>    # Convert all .ps1 files in target directory"
+    Write-Host "  chater-orm h                 # Show this help message"
     Write-Host ""
     Write-Host "WHAT IS BOM (Byte Order Mark)?" -ForegroundColor Yellow
     Write-Host "  • A special marker at the beginning of text files"

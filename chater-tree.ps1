@@ -55,7 +55,7 @@ function Format-FileSize {
     else { return "{0:N1} GB" -f ($Size / 1GB) }
 }
 
-function Should-IgnoreItem {
+function Test-IgnoreItem {
     param(
         [string]$ItemName,
         [string]$ItemPath,
@@ -80,6 +80,8 @@ function Should-IgnoreItem {
     return $false
 }
 
+$Global:shownItemsCount = 0
+
 function Show-TreeStructure {
     param(
         [string]$RootPath,
@@ -93,16 +95,16 @@ function Show-TreeStructure {
         [string]$Prefix = "",
         [int]$CurrentDepth = 0
     )
-    
+
     if ($MaxDepth -ne -1 -and $CurrentDepth -ge $MaxDepth) { return }
-    
+
     try {
         $items = Get-ChildItem -Path $RootPath -Force | Sort-Object @{Expression={$_.PSIsContainer}; Descending=$true}, Name
         $filteredItems = @()
         
         foreach ($item in $items) {
             # Apply ignore filters
-            if (Should-IgnoreItem -ItemName $item.Name -ItemPath $item.FullName -IsDirectory $item.PSIsContainer -IgnorePatterns $IgnorePatterns -ShowAll $ShowAll) {
+            if (Test-IgnoreItem -ItemName $item.Name -ItemPath $item.FullName -IsDirectory $item.PSIsContainer -IgnorePatterns $IgnorePatterns -ShowAll $ShowAll) {
                 continue
             }
             
@@ -125,6 +127,8 @@ function Show-TreeStructure {
             $filteredItems += $item
         }
         
+        $Global:shownItemsCount += $filteredItems.Count
+
         for ($i = 0; $i -lt $filteredItems.Count; $i++) {
             $item = $filteredItems[$i]
             $isLast = ($i -eq $filteredItems.Count - 1)
@@ -279,14 +283,11 @@ Write-Host ""
 
 # Show summary
 $totalItems = (Get-ChildItem -Path $resolvedPath -Recurse -Force | Measure-Object).Count
-$visibleItems = if ($ShowAll) { $totalItems } else { 
-    (Get-ChildItem -Path $resolvedPath -Recurse -Force | Where-Object { 
-        -not (Should-IgnoreItem -ItemName $_.Name -ItemPath $_.FullName -IsDirectory $_.PSIsContainer -IgnorePatterns $allIgnorePatterns -ShowAll $false)
-    } | Measure-Object).Count 
-}
+Write-Host "📊 Summary: $totalItems items found" -ForegroundColor Cyan
+Write-Host "📊 Summary: $Global:shownItemsCount items found" -ForegroundColor Cyan
 
-Write-Host "📊 Summary: $visibleItems items shown" -ForegroundColor Cyan
-if (-not $ShowAll -and $totalItems -gt $visibleItems) {
-    Write-Host "   ($($totalItems - $visibleItems) items filtered out)" -ForegroundColor Gray
+Write-Host "📊 Summary: $Global:shownItemsCount items shown" -ForegroundColor Cyan
+if (-not $ShowAll -and $totalItems -gt $Global:shownItemsCount) {
+    Write-Host "   ($($totalItems - $Global:shownItemsCount) items filtered out)" -ForegroundColor Gray
 }
 Write-Host ""

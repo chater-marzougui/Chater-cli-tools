@@ -1,9 +1,15 @@
-﻿$envFilePath = Join-Path $PSScriptRoot ".env"
+﻿param(
+    [Parameter(Position=0)]
+    [string]$Command
+)
+
+$envFilePath = Join-Path $PSScriptRoot ".env"
 $scriptDir = (Get-Content $envFilePath | Where-Object { $_ -match "^MainScriptsPath=" }) -replace "MainScriptsPath=", ""
 if (-Not $scriptDir) { $scriptDir = "C:\custom-scripts" } else { $scriptDir = $scriptDir.Trim().Trim('"').Trim("'") }
 
 # Resolve the current script path
 $currentScript = $MyInvocation.MyCommand.Path
+$currentScriptName = $MyInvocation.MyCommand.Name
 
 # Ensure the directory exists
 if (-Not (Test-Path $scriptDir)) {
@@ -18,10 +24,13 @@ Write-Host ("=" * 60) -ForegroundColor Cyan
 Write-Host ""
 
 # Get all .ps1 files in the directory
-$scripts = Get-ChildItem -Path $scriptDir -Filter "chater*.ps1"
-$totalScripts = $scripts.Count - 1
+if ([string]::IsNullOrWhiteSpace($Command)) {
+    $scripts = Get-ChildItem -Path $scriptDir -Filter "*.ps1" | Where-Object { $_.Name -ne "$currentScriptName" }
+} else {
+    $scripts = Get-ChildItem -Path $scriptDir -Filter "*.ps1" | Where-Object { $_.Name -like "*$Command*" }
+}
+$totalScripts = $scripts.Count
 $currentIndex = 0
-
 $scripts | ForEach-Object {
     $ps1Path = $_.FullName
     $baseName = $_.BaseName

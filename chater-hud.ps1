@@ -31,7 +31,9 @@ function Show-CyberBanner {
 }
 
 function Show-Help {
-    Show-CyberBanner
+    param(
+        [bool]$Small
+    )
     Write-Host ""
     Write-Host "CYBER HUD - Advanced System Monitoring Tool" -ForegroundColor Green
     Write-Host "===========================================" -ForegroundColor Green
@@ -41,10 +43,13 @@ function Show-Help {
     Write-Host "  Monitors CPU, memory, disk usage, network status, security, and development tools."
     Write-Host ""
     Write-Host "USAGE:" -ForegroundColor Yellow
-    Write-Host "  .\chater-hud.ps1                    # Start monitoring with default settings"
-    Write-Host "  .\chater-hud.ps1 -Help              # Show this help message"
-    Write-Host "  .\chater-hud.ps1 h                  # Show this help message"
+    Write-Host "  chater-hud.ps1                    # Start monitoring with default settings"
+    Write-Host "  chater-hud.ps1 -Help              # Show this help message"
+    Write-Host "  chater-hud.ps1 h                  # Show this help message"
     Write-Host ""
+    if ($Small) {
+        return
+    }
     Write-Host "FEATURES:" -ForegroundColor Yellow
     Write-Host "  📊 SYSTEM VITALS"
     Write-Host "     • CPU usage alerts"
@@ -63,7 +68,8 @@ function Show-Help {
 }
 
 if ($Help -or $Command -eq "h" -or $Command -eq "-h") {
-    Show-Help
+    $isSmall = $Arguments -contains "--small" -or $Command -eq "--small"
+    Show-Help $isSmall
     return
 }
 
