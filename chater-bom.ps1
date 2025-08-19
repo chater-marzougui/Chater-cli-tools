@@ -33,9 +33,9 @@ function Show-Help {
     Write-Host "  across different systems and editors."
     Write-Host ""
     Write-Host "USAGE:" -ForegroundColor Yellow
-    Write-Host "  chater-orm                   # Convert all .ps1 files in $scriptDir"
-    Write-Host "  chater-orm -d <directory>    # Convert all .ps1 files in target directory"
-    Write-Host "  chater-orm h                 # Show this help message"
+    Write-Host "  chater-bom                   # Convert all .ps1 files in $scriptDir"
+    Write-Host "  chater-bom -d <directory>    # Convert all .ps1 files in target directory"
+    Write-Host "  chater-bom h                 # Show this help message"
     Write-Host ""
     if ($isSmall) {
         return

@@ -100,7 +100,7 @@ From AI-powered assistance and Git automation to system monitoring and port mana
 | **🔐 chater-env** | Environment variable manager | Project-specific configuration management |
 | **📦 chater-git** | Git workflow automation | Streamlined add, commit, and push operations |
 | **📊 chater-hud** | System monitoring dashboard | Real-time system vitals with cyberpunk aesthetics |
-| **🔄 chater-orm** | UTF-8 BOM converter | Ensures proper PowerShell script encoding |
+| **🔄 chater-bom** | UTF-8 BOM converter | Ensures proper PowerShell script encoding |
 | **🌐 chater-port** | Port scanner and manager and task killer | Network diagnostics and process management |
 | **✈️ chater-serve**| Port forwarding tool | Make your local project accessible globbaly with diff options | 
 | **📝 chater-tasks** | Task management system | Priority-based todo list with due dates |
@@ -422,7 +422,7 @@ yourname-adapt
 you need to convert it to UTF8 with DOM for special characters like emojis,
 that's why this file exists,
 ```powershell
-yourname-orm
+yourname-bom
 ```
 6. **Run your new command** no need for restarting it works directly
 ```
@@ -474,9 +474,9 @@ All tools are open source and can be modified to fit your needs:
 
 1. **Edit the script** in `C:\custom-scripts\`
 2. **Test your changes**
-3. **Run the ORM tool** to ensure proper encoding:
+3. **Run the BOM tool** to ensure proper encoding:
 ```powershell
-yourname-orm
+yourname-bom
 ```
 
 <div align="right">
@@ -553,7 +553,7 @@ yourname-adapt
 
 3. **Fix encoding issues**:
 ```powershell
-yourname-orm
+yourname-bom
 ```
 
 ### Performance Issues

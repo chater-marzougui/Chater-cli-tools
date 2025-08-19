@@ -34,11 +34,12 @@ function Show-Help {
     Write-Host "USAGE:" -ForegroundColor Yellow
     Write-Host "  chater-ask `"your question here`"" -ForegroundColor Green
     Write-Host "  chater-ask your question without quotes" -ForegroundColor Green
-    Write-Host "  chater-ask -h                          # Show this help message" -ForegroundColor Green
-    Write-Host "  chater-ask help                        # Show this help message" -ForegroundColor Green
     Write-Host "  chater-ask `"your question`" --p         # Use gemini-2.5-pro model" -ForegroundColor Green
     Write-Host "  chater-ask `"your question`" --f         # Use gemini-2.5-flash model" -ForegroundColor Green
     Write-Host "  chater-ask `"your question`" --m <name>  # Use another model" -ForegroundColor Green
+    Write-Host "  chater-ask --clear                       # Clear conversation history" -ForegroundColor Green
+    Write-Host "  chater-ask help                        # Show this help message" -ForegroundColor Green
+    Write-Host "  chater-ask -h                          # Show this help message" -ForegroundColor Green
     Write-Host ""
     if ($isSmall) {
         return
