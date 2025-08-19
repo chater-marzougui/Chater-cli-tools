@@ -21,8 +21,8 @@ if (-not (Test-Path $TasksFile)) {
     Write-Host "Created new tasks file: $TasksFile" -ForegroundColor Green
 }
 
-function ParseArguments {
-    param([string[]]$Args)
+function Get-Arguments {
+    param([string[]]$AllArgs)
     
     $result = @{
         TaskText = ""
@@ -34,29 +34,29 @@ function ParseArguments {
     $textParts = @()
     $i = 0
     
-    while ($i -lt $Arguments.Count) {
-        $arg = $Arguments[$i]
+    while ($i -lt $AllArgs.Count) {
+        $arg = $AllArgs[$i]
         
         switch -Regex ($arg) {
             "^-p$|^--priority$|^--p$" {
-                if ($i + 1 -lt $Arguments.Count) {
-                    $result.Priority = $Arguments[$i + 1].ToLower()
+                if ($i + 1 -lt $AllArgs.Count) {
+                    $result.Priority = $AllArgs[$i + 1].ToLower()
                     $i++
                 }
             }
             "^-due$|^--due$|^--d$|^--duedate$|^-d$" {
-                if ($i + 1 -lt $Arguments.Count) {
+                if ($i + 1 -lt $AllArgs.Count) {
                     try {
-                        $result.DueDate = [DateTime]::Parse($Arguments[$i + 1])
+                        $result.DueDate = [DateTime]::Parse($AllArgs[$i + 1])
                     } catch {
-                        Write-Host "Warning: Invalid date format '$($Arguments[$i + 1])'. Use YYYY-MM-DD format." -ForegroundColor Yellow
+                        Write-Host "Warning: Invalid date format '$($AllArgs[$i + 1])'. Use YYYY-MM-DD format." -ForegroundColor Yellow
                     }
                     $i++
                 }
             }
-            "^--sort$|^--sortby$|^--s$|^--s$" {
-                if ($i + 1 -lt $Arguments.Count) {
-                    $result.SortBy = $Arguments[$i + 1].ToLower()
+            "^--sort$|^--sortby$|^--s$" {
+                if ($i + 1 -lt $AllArgs.Count) {
+                    $result.SortBy = $AllArgs[$i + 1].ToLower()
                     $i++
                 }
             }
@@ -132,7 +132,7 @@ function Format-TaskLine {
     return $taskLine
 }
 
-function ParseTaskLine {
+function Get-TaskLine {
     param([string]$TaskLine)
     
     $task = @{
@@ -182,9 +182,9 @@ function ParseTaskLine {
 }
 
 function Add-Task {
-    param([string[]]$Args)
+    param([string[]]$AllArgs)
     
-    $parsed = ParseArguments -Args $Arguments
+    $parsed = Get-Arguments -AllArgs $AllArgs
 
     Write-Host $parsed.dueDate -ForegroundColor Green
 
@@ -232,7 +232,7 @@ function Add-Task {
     }
 }
 
-function SortTasks {
+function Invoke-TaskSort {
     param(
         [array]$Tasks,
         [string]$SortBy
@@ -260,27 +260,27 @@ function SortTasks {
     }
 }
 
-function ListTasks {
-    param([string[]]$Args)
+function Show-Tasks-List {
+    param([string[]]$AllArgs)
     
     if (-not (Test-Path $TasksFile) -or (Get-Content $TasksFile).Count -eq 0) {
         Write-Host "No tasks found." -ForegroundColor Yellow
         return
     }
-    
-    $parsed = ParseArguments -Args $Args
+
+    $parsed = Get-Arguments -AllArgs $AllArgs
     $taskLines = Get-Content $TasksFile
     $tasks = @()
     
     foreach ($line in $taskLines) {
         if (-not [string]::IsNullOrWhiteSpace($line)) {
-            $tasks += ParseTaskLine -TaskLine $line
+            $tasks += Get-TaskLine -TaskLine $line
         }
     }
     
     # Sort tasks if requested
     if ($parsed.SortBy) {
-        $tasks = SortTasks -Tasks $tasks -SortBy $parsed.SortBy
+        $tasks = Invoke-TaskSort -Tasks $tasks -SortBy $parsed.SortBy
     }
     
     Write-Host "`nCurrent Tasks:" -ForegroundColor Cyan
@@ -343,7 +343,7 @@ function Complete-Task {
         $tasks[$taskIndex] = $task -replace '^\[ \]', '[x]'
         $tasks | Out-File -FilePath $TasksFile -Encoding UTF8
         
-        $parsedTask = ParseTaskLine -TaskLine $tasks[$taskIndex]
+        $parsedTask = Get-TaskLine -TaskLine $tasks[$taskIndex]
         Write-Host "✅ Completed: $($parsedTask.Text)" -ForegroundColor Green
     } elseif ($task -match '^\[x\]') {
         Write-Host "Task $TaskNumber is already completed!" -ForegroundColor Yellow
@@ -352,7 +352,7 @@ function Complete-Task {
     }
 }
 
-function UncompleteTask {
+function Reset-Task {
     param([int]$TaskNumber)
     
     if (-not (Test-Path $TasksFile)) {
@@ -374,7 +374,7 @@ function UncompleteTask {
         $tasks[$taskIndex] = $task -replace '[x]', ' '
         $tasks | Out-File -FilePath $TasksFile -Encoding UTF8
         
-        $parsedTask = ParseTaskLine -TaskLine $tasks[$taskIndex]
+        $parsedTask = Get-TaskLine -TaskLine $tasks[$taskIndex]
         Write-Host "✅ Uncompleted: $($parsedTask.Text)" -ForegroundColor Green
     } elseif ($task -match '^\[ \]') {
         Write-Host "Task $TaskNumber is already Open!" -ForegroundColor Yellow
@@ -400,7 +400,7 @@ function Remove-Task {
     
     $taskIndex = $TaskNumber - 1
     $removedTaskLine = $tasks[$taskIndex]
-    $parsedTask = ParseTaskLine -TaskLine $removedTaskLine
+    $parsedTask = Get-TaskLine -TaskLine $removedTaskLine
     
     # Remove the task
     $newTasks = $tasks | Where-Object { $_ -ne $removedTaskLine }
@@ -474,7 +474,7 @@ function Show-Stats {
     
     $tasks = @()
     foreach ($line in $taskLines) {
-        $tasks += ParseTaskLine -TaskLine $line
+        $tasks += Get-TaskLine -TaskLine $line
     }
     
     $totalTasks = $tasks.Count
@@ -581,10 +581,10 @@ $removeCommands = @("remove", "delete", "rm", "del")
 # Main command processing
 switch ($Command.ToLower()) {
     "add" {
-        Add-Task -Args $Arguments
+        Add-Task -AllArgs $Arguments
     }
     "list" {
-        ListTasks -Args $Arguments
+        Show-Tasks-List -AllArgs $Arguments
     }
     {$_ -in $completedCommands} {
         if ($Arguments.Count -eq 0 -or -not [int]::TryParse($Arguments[0], [ref]$null)) {
@@ -599,7 +599,7 @@ switch ($Command.ToLower()) {
             Write-Host "Error: Please provide a valid task number" -ForegroundColor Red
             Write-Host "Usage: chater-tasks undo <task_number>"
         } else {
-            UncompleteTask -TaskNumber ([int]$Arguments[0])
+            Reset-Task -TaskNumber ([int]$Arguments[0])
         }
     }
     {$_ -in $removeCommands} {
@@ -620,6 +620,6 @@ switch ($Command.ToLower()) {
         Show-Stats
     }
     default {
-        ListTasks -Args $Arguments
+        Show-Tasks-List -AllArgs $Arguments
     }
 }
