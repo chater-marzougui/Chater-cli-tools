@@ -20,6 +20,7 @@ function Show-Help {
     Write-Host ""
     Write-Host "USAGE:" -ForegroundColor Yellow
     Write-Host "  chater-common -c <Long> -t <Short>      # Create a script for the specified command"
+    Write-Host "  chater-common -f <Path> -t <Short>      # Create a cli shortcut for the specified file"
     Write-Host "  chater-common -l <command>              # List all available commands"
     Write-Host "  chater-common -rm <command>             # Delete the script for the specified command"
     Write-Host "  chater-common -u <command>              # Edit the script for the specified command"
@@ -84,7 +85,51 @@ function Create_Command {
         # Run chater-adapt to create .cmd wrappers
         Write-Host "✅ Script created successfully: $scriptPath" -ForegroundColor Green
         & "chater-adapt" -d $commonScriptDir
-        Write-Host "  $commandName ➡️  $targetCommand" -ForegroundColor White
+        Write-Host "  $commandName → $targetCommand" -ForegroundColor White
+    }
+    catch {
+        Write-Host "Error creating script: $($_.Exception.Message)" -ForegroundColor Red
+    }
+}
+
+function Create_FileShortcut {
+    param(
+        [string]$commandName,
+        [string]$targetCommand
+    )
+
+    if ([string]::IsNullOrWhiteSpace($commandName) -or [string]::IsNullOrWhiteSpace($targetCommand)) {
+        Write-Host "Error: Both full file path and target command are required." -ForegroundColor Red
+        Write-Host "Usage: chater-common -f <path> -t <target>" -ForegroundColor Yellow
+        return
+    }
+
+    Ensure_DirectoryExists
+
+    if (-not (Test-Path $commandName)) {
+        Write-Host "Error: Full file path '$commandName' does not exist." -ForegroundColor Red
+        return
+    }
+
+    $scriptPath = Join-Path $commonScriptDir "$targetCommand.ps1"
+
+    # Create script content with parameter support
+    $scriptContent = @"
+# Auto-generated script for: $targetCommand
+# Original file path: $commandName
+# Generated on: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+
+`$fullCommand = "$commandName"
+& `$fullCommand
+"@
+
+
+    try {
+        Set-Content -Path $scriptPath -Value $scriptContent -Encoding UTF8
+        # Run chater-adapt to create .cmd wrappers
+        Write-Host "✅ Script created successfully: $scriptPath" -ForegroundColor Green
+        & "chater-adapt" -d $commonScriptDir
+        Write-Host "  $commandName → $targetCommand" -ForegroundColor White
     }
     catch {
         Write-Host "Error creating script: $($_.Exception.Message)" -ForegroundColor Red
@@ -114,21 +159,29 @@ function List_Commands {
             # Read the script content to extract the original command
             $content = Get-Content $scriptPath -Raw
             $originalCommandMatch = [regex]::Match($content, '# Original command: (.+)')
-            
+            $originalFilePathMatch = [regex]::Match($content, '# Original file path: (.+)')
+
             if ($originalCommandMatch.Success) {
                 $originalCommand = $originalCommandMatch.Groups[1].Value.Trim()
-                Write-Host "  $commandName" -ForegroundColor Cyan -NoNewline
-                Write-Host " ➡️  " -ForegroundColor White -NoNewline
+                Write-Host "⚡  $commandName" -ForegroundColor Cyan -NoNewline
+                Write-Host " → " -ForegroundColor White -NoNewline
                 Write-Host "$originalCommand" -ForegroundColor Gray
-            } else {
-                Write-Host "  $commandName" -ForegroundColor Cyan -NoNewline
-                Write-Host " ➡️  " -ForegroundColor White -NoNewline
+            } 
+            elseif($originalFilePathMatch.Success) {
+                $originalFilePath = $originalFilePathMatch.Groups[1].Value.Trim()
+                Write-Host "📄  $commandName" -ForegroundColor Cyan -NoNewline
+                Write-Host " → " -ForegroundColor White -NoNewline
+                Write-Host "$originalFilePath" -ForegroundColor Gray
+            } 
+            else {
+                Write-Host "⚠️  $commandName" -ForegroundColor Cyan -NoNewline
+                Write-Host " → " -ForegroundColor White -NoNewline
                 Write-Host "[Command not found in script]" -ForegroundColor Red
             }
         }
         catch {
             Write-Host "  $commandName" -ForegroundColor Cyan -NoNewline
-            Write-Host " ➡️  " -ForegroundColor White -NoNewline
+            Write-Host " → " -ForegroundColor White -NoNewline
             Write-Host "[Error reading script]" -ForegroundColor Red
         }
     }
@@ -223,8 +276,14 @@ for ($i = 0; $i -lt $Arguments.Length; $i++) {
                 $i++
             }
         }
+        { $_ -in @("-f", "--file", "-file", "--f") } {
+            $action = "fileshortcut"
+            if ($i + 1 -lt $Arguments.Length) {
+                $commandName = $Arguments[$i + 1]
+                $i++
+            }
+        }
         "-t" {
-            $action = "create"
             if ($i + 1 -lt $Arguments.Length) {
                 $targetCommand = $Arguments[$i + 1]
                 $i++
@@ -256,10 +315,19 @@ if ($Arguments.Count -eq 2 -and $null -eq $action) {
     $targetCommand = $Arguments[1]
 }
 
+
+if ($Arguments.Count -eq 3 -and $action -eq "fileshortcut" -and ($null -eq $targetCommand -or $null -eq $commandName)) {
+    $action = "fileshortcut"
+    $commandName = $Arguments[0]
+    $targetCommand = $Arguments[1]
+}
 # Execute based on action
 switch ($action) {
     "create" {
         Create_Command -commandName $commandName -targetCommand $targetCommand
+    }
+    "fileshortcut" {
+        Create_FileShortcut -commandName $commandName -targetCommand $targetCommand
     }
     "list" {
         List_Commands

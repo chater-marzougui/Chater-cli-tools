@@ -5,6 +5,19 @@
 $StartTime = Get-Date
 $modelName = "gemini-2.5-flash-lite"
 
+# Configuration
+$ConversationHistoryFile = Join-Path $PSScriptRoot "helpers\conv-history.txt"
+
+# Ensure conversation history file exists
+if (-not (Test-Path $ConversationHistoryFile)) {
+    $parentDir = Split-Path $ConversationHistoryFile -Parent
+    if (-not (Test-Path $parentDir)) {
+        New-Item -Path $parentDir -ItemType Directory -Force | Out-Null
+    }
+    New-Item -Path $ConversationHistoryFile -ItemType File -Force | Out-Null
+    Write-Host "Created new conversation history file: $ConversationHistoryFile" -ForegroundColor Green
+}
+
 # Help function
 function Show-Help {
     param(
@@ -40,13 +53,57 @@ function Show-Help {
     Write-Host ""
 }
 
+
+function Add-ContentToHistory {
+    param(
+        [bool]$isUser = $true,  # Fixed parameter type
+        [string]$Content
+    )
+
+    # Read existing lines as array
+    $existingContent = if (Test-Path $ConversationHistoryFile) { 
+        @(Get-Content $ConversationHistoryFile) 
+    } else { 
+        @() 
+    }
+    
+    # Add new content
+    if ($isUser) {
+        $existingContent += "User: $Content"
+    } else {
+        $existingContent += "AI-Model: $Content`n"
+    }
+
+    # Write with proper line endings
+    $existingContent | Out-File -FilePath $ConversationHistoryFile -Encoding UTF8
+}
+
+function Get-ConversationHistory {
+    if (Test-Path $ConversationHistoryFile) {
+        $content = Get-Content -Path $ConversationHistoryFile
+        return $content
+    } else {
+        return @()
+    }
+}
+
+function Clear-ConversationHistory {
+    if (Test-Path $ConversationHistoryFile) {
+        Clear-Content -Path $ConversationHistoryFile
+        Write-Host "Conversation history cleared." -ForegroundColor Green
+    }
+}
+
 function Invoke-GeminiAPI {
     param(
         [string]$Question,
         [string]$ModelName,
         [string]$ApiKey
     )
-    
+
+    $convHistory = Get-ConversationHistory
+    $convHistoryText = if ($convHistory) { "Conversation History:`n$($convHistory -join "`n")" } else { "" }
+
     # Enhanced prompt for better responses
     $enhancedPrompt = @"
 Please provide a helpful, accurate, and concise response to the following question. 
@@ -62,6 +119,8 @@ return only the main response text.
 if question is too ambiguous, ask for clarification or more context.
 Also the user is a developer, so no serious tone, short answers, provide good response with playful tone, include icons or emojis.
 Question: $Question
+
+$convHistoryText
 "@
 
     # Create the request body
@@ -92,7 +151,11 @@ Question: $Question
         
         # Extract the text response
         if ($response.candidates -and $response.candidates[0].content.parts -and $response.candidates[0].content.parts[0].text) {
-            return $response.candidates[0].content.parts[0].text
+            # Add user question to conversation history
+            Add-ContentToHistory -Content $Question -isUser $true
+            $responseText = $response.candidates[0].content.parts[0].text
+            Add-ContentToHistory -Content $responseText -isUser $false
+            return $responseText
         } else {
             throw "Empty or invalid response from Gemini API"
         }
@@ -126,7 +189,9 @@ $questionParts = @()
 $hasProFlag = $false
 $hasFlashFlag = $false
 $nextArgIsModel = $false
+$clearConvHistory = $false
 
+$modelArgs = @("-m", "--model", "-model", "--m")
 foreach ($arg in $Arguments) {
     if ($nextArgIsModel) {
         $modelName = $arg
@@ -136,8 +201,11 @@ foreach ($arg in $Arguments) {
         $hasProFlag = $true
     } elseif ($arg -eq "--f") {
         $hasFlashFlag = $true
-    } elseif ($arg -eq "-m" -or $arg -eq "--model" -or $arg -eq "-model" -or $arg -eq "--m") {
+    } elseif ($modelArgs -contains $arg) {
         $nextArgIsModel = $true
+    }
+    elseif ($arg -eq "--clear" -or $arg -eq "-clear") {
+        $clearConvHistory = $true
     } else {
         $questionParts += $arg
     }
@@ -150,10 +218,14 @@ if ($hasProFlag) {
     $modelName = "gemini-2.5-flash"
 }
 
+if ($clearConvHistory) {
+    Clear-ConversationHistory
+}
+
 $Question = $questionParts -join " "
 
 # Validate question length
-if ($Question.Length -le 12) {
+if ($Question.Length -le 1) {
     Write-Host ""
     Write-Host "Prompt too short - make it bigger" -ForegroundColor Red
     Write-Host ""
@@ -175,8 +247,7 @@ if (Test-Path $envFilePath) {
 
 try {
     # Show loading indicator and timing
-    Write-Host "🤖 Generating response..." -ForegroundColor Cyan
-    Write-Host ""
+    Write-Host "🤖" -ForegroundColor Cyan
     
     # Make API call
     $response = Invoke-GeminiAPI -Question $Question -ModelName $modelName -ApiKey $apiKey
@@ -185,7 +256,7 @@ try {
     Write-Host $response
     $Now = Get-Date
     $Total = $Now - $StartTime
-    Write-Host "`n⚡ Done in $($Total.TotalSeconds.ToString("0.00"))s using $modelName" -ForegroundColor Yellow
+    Write-Host "`n⚡ Done in $($Total.TotalSeconds.ToString("0.00"))s using $modelName" -ForegroundColor DarkGray
 }
 catch {
     Write-Host ""

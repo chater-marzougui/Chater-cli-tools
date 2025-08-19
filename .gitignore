@@ -1,3 +1,4 @@
 .env
-tasks.txt
+*.txt
+
 cmd-wrappers/
