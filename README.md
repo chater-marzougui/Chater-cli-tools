@@ -103,6 +103,7 @@ From AI-powered assistance and Git automation to system monitoring and port mana
 | **🔄 chater-bom** | UTF-8 BOM converter | Ensures proper PowerShell script encoding |
 | **🌐 chater-port** | Port scanner and manager and task killer | Network diagnostics and process management |
 | **✈️ chater-serve**| Port forwarding tool | Make your local project accessible globbaly with diff options | 
+| **🔐 chater-secret**| Encrypted API key manager | Secure storage for API keys and sensitive data |
 | **📝 chater-tasks** | Task management system | Priority-based todo list with due dates |
 | **🌲 chater-tree**| Shows folders tree | With filters, files to ignore, colors and icons |
 | **📝 chater-ip** | Quick Public and Local ip check | So you don't search for them elsewhere |
@@ -358,6 +359,22 @@ chater-tree -dirs -d 2                    # Directories only, 2 levels
 chater-tree -ignore cache,temp            # Add custom ignore patterns
 chater-tree -all -size                    # Show everything with file sizes
 ```
+
+### 🔐 Secret Manager - `chater-secret`
+Securely manage API keys and sensitive data with Windows encryption.
+```powershell
+# Basic operations
+chater-secret set OPENAI_API_KEY "sk-1234567890abcdef"
+chater-secret get openai              # Fuzzy search - finds OPENAI_API_KEY
+chater-secret list                    # Show all secret names (grouped by type)
+chater-secret delete GITHUB_TOKEN    # Remove specific secret
+chater-secret clear                   # Delete all secrets (with confirmation)
+
+# Import/Export
+chater-secret import                  # Import from .env file and encrypt
+chater-secret export                  # Export to .env as plaintext
+```
+
 
 <div align="right">
   <a href="#readme-top">
