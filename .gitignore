@@ -1,4 +1,5 @@
 .env
-*.txt
 
 cmd-wrappers/
+helpers/*.json
+helpers/*.txt

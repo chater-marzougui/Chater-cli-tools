@@ -40,6 +40,18 @@ function Show-Help {
     List_Commands
 }
 
+function Test-Command {
+    param([string]$Command)
+    
+    try {
+        Get-Command $Command -ErrorAction Stop | Out-Null
+        return $true
+    }
+    catch {
+        return $false
+    }
+}
+
 function Ensure_DirectoryExists {
     if (-not (Test-Path $commonScriptDir)) {
         try {
@@ -66,6 +78,16 @@ function Create_Command {
     }
 
     Ensure_DirectoryExists
+
+    if (-not (Test-Command $commandName)) {
+        Write-Host "Error: Command '$commandName' not found." -ForegroundColor Red
+        return
+    }
+
+    if (Test-Command $targetCommand) {
+        Write-Host "Error: Target command '$targetCommand' already exists." -ForegroundColor Red
+        return
+    }
 
     $scriptPath = Join-Path $commonScriptDir "$targetCommand.ps1"
 
@@ -107,7 +129,13 @@ function Create_FileShortcut {
     Ensure_DirectoryExists
 
     if (-not (Test-Path $commandName)) {
-        Write-Host "Error: Full file path '$commandName' does not exist." -ForegroundColor Red
+        Write-Host "Error: File path '$commandName' does not exist." -ForegroundColor Red
+        return
+    }
+
+    
+    if (Test-Command $targetCommand) {
+        Write-Host "Error: Target command '$targetCommand' already exists." -ForegroundColor Red
         return
     }
 

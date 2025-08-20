@@ -57,6 +57,7 @@ function Show-Help {
     Write-Host "FLAGS:" -ForegroundColor $Colors.Warning
     Write-Host "  -p, --port <port>      Specify port number" -ForegroundColor $Colors.Success
     Write-Host "  -d, --domain <domain>  Specify domain/subdomain" -ForegroundColor $Colors.Success
+    Write-Host "  -qr                    Include QR code generation" -ForegroundColor $Colors.Success
     Write-Host "  -lt-logs               Show LocalTunnel request logs" -ForegroundColor $Colors.Success
     Write-Host ""
     if (-not $isSmall) {
@@ -206,7 +207,7 @@ function Get-LocalIP {
 }
 
 function Start-PythonServer {
-    param([string]$Port, [string]$Subdomain, [string]$Directory)
+    param([string]$Port, [string]$Subdomain, [string]$Directory, [bool]$QR)
     
     if ($Subdomain -and $Subdomain -ne "") {
         Write-Host "⚠️  Subdomain will be supported soon. For now using localhost" -ForegroundColor $Colors.Warning
@@ -221,10 +222,11 @@ function Start-PythonServer {
     
     try {
         if (Test-Command "python") {
+            if($QR) {& chater-qr "http://$(Get-LocalIP):$Port"}
             python -m http.server $Port --directory $Directory
-            Write-Host "✅ Python server started successfully!" -ForegroundColor $Colors.Success
         }
         elseif (Test-Command "python3") {
+            if($QR) {& chater-qr "http://$(Get-LocalIP):$Port"}
             python3 -m http.server $Port --directory $Directory
         }
         else {
@@ -238,7 +240,7 @@ function Start-PythonServer {
 }
 
 function Start-LocalTunnel {
-    param([string]$Port, [string]$Subdomain, [bool]$PrintRequests)
+    param([string]$Port, [string]$Subdomain, [bool]$PrintRequests, [bool]$QR)
 
     if (-not (Test-Command "lt")) {
         Write-Host "❌ LocalTunnel not found!" -ForegroundColor $Colors.Error
@@ -246,15 +248,10 @@ function Start-LocalTunnel {
         return
     }
 
-    $tunnelArgs = @("--port", $Port)
+    $tunnelArgs = @("lt", "--port", $Port)
 
     if ($Subdomain -and $Subdomain -ne "") {
         $tunnelArgs += @("--subdomain", $Subdomain)
-        Write-Host "🚇 Starting LocalTunnel on port $Port with subdomain '$Subdomain'..." -ForegroundColor $Colors.Info
-        Write-Host "🌐 Public URL: https://$Subdomain.loca.lt" -ForegroundColor $Colors.Highlight
-    }
-    else {
-        Write-Host "🚇 Starting LocalTunnel on port $Port (random subdomain)..." -ForegroundColor $Colors.Info
     }
     
     if ($PrintRequests) {
@@ -265,7 +262,43 @@ function Start-LocalTunnel {
     Write-Host ""
     
     try {
-        & lt @tunnelArgs
+        if (Test-Path "STDOUT.txt") { Remove-Item "STDOUT.txt" -Force }
+        if (Test-Path "STDERR.txt") { Remove-Item "STDERR.txt" -Force }
+        $process = Start-Process "npx" -ArgumentList $tunnelArgs `
+        -RedirectStandardOutput "STDOUT.txt" -RedirectStandardError "STDERR.txt" `
+        -NoNewWindow -PassThru
+
+        # Wait until it outputs the public URL
+        $publicUrl = $null
+        $lastLineCount = 0
+        Start-Sleep -Seconds 1
+        while (-not $process.HasExited) {
+            if (Test-Path "STDOUT.txt") {
+                $lines = Get-Content "STDOUT.txt"
+                if($lines -and $lines.GetType().Name -eq "String") {
+                    if ($lastLineCount -eq 1) {
+                        continue;
+                    }
+                    $lastLineCount = 1
+                    if ($lines -match "your url is: (https?://[^\s]+)") {
+                        $publicUrl = $matches[1]
+                        Write-Host "✅ LocalTunnel URL: $publicUrl" -ForegroundColor Green
+                        if ($QR) {
+                            Write-Host "📱 Generating QR code for: $publicUrl" -ForegroundColor Cyan
+                            & chater-qr $publicUrl
+                        }
+                    }
+                }
+                elseif ($lines) {
+                    $newLines = $lines[$lastLineCount..($lines.Count)]
+                    $lastLineCount = $lines.Count
+
+                    foreach ($line in $newLines) {
+                        Write-Host "[lt] $line" -ForegroundColor Green
+                    }
+                }
+            }
+        }
     }
     catch {
         Write-Host "❌ Failed to start LocalTunnel: $($_.Exception.Message)" -ForegroundColor $Colors.Error
@@ -274,8 +307,8 @@ function Start-LocalTunnel {
 }
 
 function Start-Ngrok {
-    param([string]$Port)
-    
+    param([string]$Port, [bool]$QR)
+
     $ngrokPath = Join-Path $HelpersDir "ngrok.exe"
     
     if (-not (Test-Path $ngrokPath)) {
@@ -303,6 +336,23 @@ function Start-Ngrok {
     Write-Host ""
     
     try {
+        $job = Start-Job -ScriptBlock {
+            param([bool]$isQR)
+            if(-not $isQR) {
+                return
+            }
+            Start-Sleep -Seconds 2
+
+            $ngrokApi = Invoke-RestMethod -Uri "http://localhost:4040/api/tunnels" -ErrorAction Stop
+            $publicUrl = $ngrokApi.tunnels[0].public_url
+
+            if ($publicUrl) {
+                Write-Host "📱 Generating QR code for: $publicUrl" -ForegroundColor $Colors.Info
+                & chater-qr $publicUrl
+            }
+        } -ArgumentList $QR
+
+        
         & $ngrokPath http $Port
     }
     catch {
@@ -324,7 +374,6 @@ function Start-Serveo {
     }
     else {
         $tunnelArgs += "80:localhost:$Port"
-        Write-Host "🚇 Starting Serveo on port $Port (random subdomain)..." -ForegroundColor $Colors.Info
     }
 
     $tunnelArgs += "serveo.net"
@@ -352,6 +401,7 @@ function ParseArguments {
         SetupOption = $null
         ShowHelp = $false
         ShowSmallHelp = $false
+        QR = $false
     }
 
     # Help check
@@ -398,6 +448,10 @@ function ParseArguments {
                     "^(serveo|-serveo|--serveo)" { $result.Option = "serveo" }
                     default { $result.Option = "python" }
                 }
+                break
+            }
+            '^(--qr|-qr)$' {
+                $result.QR = $true
                 break
             }
             '^-lt-logs$' {
@@ -480,16 +534,16 @@ if ($parsed.Option -eq "ngrok" -and $parsed.Domain) {
 # Start the appropriate server
 switch ($parsed.Option) {
     "python" {
-        Start-PythonServer -Port $parsed.Port -Subdomain $parsed.Domain -Directory $parsed.Directory
+        Start-PythonServer -Port $parsed.Port -Subdomain $parsed.Domain -Directory $parsed.Directory -QR $parsed.QR
     }
     "tunnel" {
-        Start-LocalTunnel -Port $parsed.Port -Subdomain $parsed.Domain -PrintRequests $parsed.PrintRequests
+        Start-LocalTunnel -Port $parsed.Port -Subdomain $parsed.Domain -PrintRequests $parsed.PrintRequests -QR $parsed.QR
     }
     "ngrok" {
-        Start-Ngrok -Port $parsed.Port
+        Start-Ngrok -Port $parsed.Port -QR $parsed.QR
     }
     "serveo" {
-        Start-Serveo -Port $parsed.Port -Subdomain $parsed.Domain
+        Start-Serveo -Port $parsed.Port -Subdomain $parsed.Domain -QR $parsed.QR
     }
     default {
         Write-Host "❌ Unknown option: $($parsed.Option)" -ForegroundColor $Colors.Error
