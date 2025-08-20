@@ -4,4 +4,4 @@
 
 # Original command with additional arguments support
 $fullCommand = "npm run backend"
-& $fullCommand @args
+Invoke-Expression $fullCommand @args

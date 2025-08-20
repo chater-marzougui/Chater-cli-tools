@@ -4,4 +4,4 @@
 
 # Original command with additional arguments support
 $fullCommand = "npm run admin"
-& $fullCommand @args
+Invoke-Expression $fullCommand @args

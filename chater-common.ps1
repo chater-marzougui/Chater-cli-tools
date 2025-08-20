@@ -99,7 +99,7 @@ function Create_Command {
 
 # Original command with additional arguments support
 `$fullCommand = "$commandName"
-& `$fullCommand @args
+Invoke-Expression `$fullCommand @args
 "@
 
     try {

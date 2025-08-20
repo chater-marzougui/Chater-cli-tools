@@ -26,6 +26,9 @@ function Get-EnvVariable {
 # Get script directory
 $ScriptsDir = Get-EnvVariable "MainScriptsPath"
 $HelpersDir = Join-Path $ScriptsDir "helpers"
+$logsDir = Join-Path $ScriptsDir "logs"
+$STDOUTFile = Join-Path $logsDir "STDOUT.txt"
+$STDERRFile = Join-Path $logsDir "STDERR.txt"
 
 function Show-Help {
     param (
@@ -89,6 +92,10 @@ function Test-Command {
     catch {
         return $false
     }
+}
+
+if(-not (Test-Path $logsDir)) {
+    New-Item -ItemType Directory -Path $logsDir -Force | Out-Null
 }
 
 function Setup-Python {
@@ -262,19 +269,19 @@ function Start-LocalTunnel {
     Write-Host ""
     
     try {
-        if (Test-Path "STDOUT.txt") { Remove-Item "STDOUT.txt" -Force }
-        if (Test-Path "STDERR.txt") { Remove-Item "STDERR.txt" -Force }
+        if (Test-Path $STDOUTFile) { Remove-Item $STDOUTFile -Force }
+        if (Test-Path $STDERRFile) { Remove-Item $STDERRFile -Force }
         $process = Start-Process "npx" -ArgumentList $tunnelArgs `
-        -RedirectStandardOutput "STDOUT.txt" -RedirectStandardError "STDERR.txt" `
+        -RedirectStandardOutput $STDOUTFile -RedirectStandardError $STDERRFile `
         -NoNewWindow -PassThru
 
         # Wait until it outputs the public URL
         $publicUrl = $null
         $lastLineCount = 0
-        Start-Sleep -Seconds 1
         while (-not $process.HasExited) {
-            if (Test-Path "STDOUT.txt") {
-                $lines = Get-Content "STDOUT.txt"
+            Start-Sleep -Milliseconds 100
+            if (Test-Path $STDOUTFile) {
+                $lines = Get-Content $STDOUTFile
                 if($lines -and $lines.GetType().Name -eq "String") {
                     if ($lastLineCount -eq 1) {
                         continue;
@@ -361,11 +368,13 @@ function Start-Ngrok {
     }
 }
 
-
 function Start-Serveo {
-    param([string]$Port, [string]$Subdomain)
-    
-    $tunnelArgs = @()
+    param([string]$Port, [string]$Subdomain, [bool]$QR)
+
+    if (Test-Path $STDOUTFile) { Remove-Item $STDOUTFile -Force }
+    if (Test-Path $STDERRFile) { Remove-Item $STDERRFile -Force }
+
+    $tunnelArgs = @("-R")
 
     if ($Subdomain -and $Subdomain -ne "") {
         $tunnelArgs += "$Subdomain:80:localhost:$Port"
@@ -379,13 +388,90 @@ function Start-Serveo {
     $tunnelArgs += "serveo.net"
 
     Write-Host "🛑 Press Ctrl+C to stop" -ForegroundColor $Colors.Warning
-    Write-Host ""
-    
     try {
-        & ssh -R @tunnelArgs
+        $process = Start-Process "ssh" -ArgumentList $tunnelArgs -RedirectStandardOutput $STDOUTFile -RedirectStandardError $STDERRFile -NoNewWindow -PassThru
+
+        # Register cleanup on process exit
+        $eventJob = Register-ObjectEvent -InputObject $process -EventName Exited -Action {
+            Start-Sleep -Seconds 1
+            if (Test-Path $STDOUTFile) { Remove-Item $STDOUTFile -Force -ErrorAction SilentlyContinue }
+            if (Test-Path $STDERRFile) { Remove-Item $STDERRFile -Force -ErrorAction SilentlyContinue }
+        }
+
+        # Read the file as raw bytes to handle control characters properly
+        $stream = [System.IO.File]::Open($STDOUTFile, [System.IO.FileMode]::OpenOrCreate, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+        $reader = New-Object System.IO.StreamReader($stream)
+        $position = 0
+        
+        # Also monitor stderr
+        $errorStream = [System.IO.File]::Open($STDERRFile, [System.IO.FileMode]::OpenOrCreate, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+        $errorReader = New-Object System.IO.StreamReader($errorStream)
+        $errorPosition = 0
+        
+        while (-not $process.HasExited) {
+            # Check for errors
+            $errorStream.Seek($errorPosition, [System.IO.SeekOrigin]::Begin) | Out-Null
+            $errorContent = $errorReader.ReadToEnd()
+            $errorPosition = $errorStream.Position
+            
+            if ($errorContent -and $errorContent.Trim().Length -gt 0) {
+                $time = Get-Date -Format "HH:mm:ss"
+                [console]::WriteLine("[$time] ERROR: $($errorContent.Trim())")
+                if($Subdomain) {
+                    [console]::WriteLine("❌ Subdomains with serveo need to be configured")
+                }
+                $process | Stop-Process -Force -ErrorAction SilentlyContinue
+                break
+            }
+            
+            # Read new content from stdout
+            $stream.Seek($position, [System.IO.SeekOrigin]::Begin) | Out-Null
+            $newContent = $reader.ReadToEnd()
+            $position = $stream.Position
+            
+            if ($newContent -and $newContent.Trim().Length -gt 0) {
+                # Clean up ANSI escape sequences and control characters
+                $cleanContent = $newContent -replace '\x1b\[[0-9;]*[A-Za-z]', '' -replace '\x08', ''
+                
+                # Split by carriage return and process each "line"
+                $lines = $cleanContent -split "`r" | Where-Object { $_.Trim().Length -gt 0 }
+                foreach ($line in $lines) {
+                    $trimmedLine = $line.Trim()
+                    
+                    if ($trimmedLine -match "Forwarding HTTP traffic from (https?://[^\s]+)") {
+                        [console]::WriteLine("")
+                        Write-Host "✅ LocalTunnel URL: $($matches[1])" -ForegroundColor Green
+                        [console]::WriteLine("")
+                        if ($QR) {
+                            & chater-qr $matches[1] 2>$null
+                        }
+                    }
+                    elseif ($trimmedLine.Length -gt 5 -and -not $trimmedLine.StartsWith('K')) {
+                        # Write each message on a new line with timestamp
+                        $time = Get-Date -Format "HH:mm:ss"
+                        [System.Console]::WriteLine("[$time] $trimmedLine")
+                    }
+                }
+            }
+            
+            Start-Sleep -Milliseconds 100
+        }
     }
     catch {
         Write-Host "❌ Failed to start Serveo: $($_.Exception.Message)" -ForegroundColor $Colors.Error
+    }
+    finally {
+        # Cleanup resources
+        try {
+            if ($reader) { $reader.Close(); $reader.Dispose() }
+            if ($stream) { $stream.Close(); $stream.Dispose() }
+            if ($errorReader) { $errorReader.Close(); $errorReader.Dispose() }
+            if ($errorStream) { $errorStream.Close(); $errorStream.Dispose() }
+            if ($eventJob) { $eventJob | Remove-Job -Force }
+            if ($process -and -not $process.HasExited) { $process | Stop-Process -Force -ErrorAction SilentlyContinue }
+            if (Test-Path $STDOUTFile) { Remove-Item $STDOUTFile -Force -ErrorAction SilentlyContinue }
+            if (Test-Path $STDERRFile) { Remove-Item $STDERRFile -Force -ErrorAction SilentlyContinue }
+        } catch {}
     }
 }
 
@@ -417,7 +503,7 @@ function ParseArguments {
     $setupArgs = @("--s", "--setup", "-s", "-setup", "s", "setup")
     if ($Arguments.Where({ $_ -in $setupArgs }).Count -gt 0) {
         $result.IsSetup = $true
-        $possibleOptions = @("python", "tunnel", "ngrok")
+        $possibleOptions = @("python", "tunnel", "ngrok", "--n", "--lt")
         $result.SetupOption = ($Arguments | Where-Object { $_.ToLower() -in $possibleOptions })
         return $result
     }
@@ -491,8 +577,8 @@ if ($parsed.ShowHelp) {
 if ($parsed.IsSetup) {
     switch ($parsed.SetupOption) {
         "python" { Setup-Python }
-        "tunnel" { Setup-LocalTunnel }
-        "ngrok" { Setup-Ngrok }
+        { $_ -in @("tunnel", "--lt") } { Setup-LocalTunnel }
+        { $_ -in @("ngrok", "--n") } { Setup-Ngrok }
         default {
             Write-Host "❌ Unknown setup option: $($parsed.SetupOption)" -ForegroundColor $Colors.Error
             Write-Host "Available options: python, tunnel, ngrok" -ForegroundColor $Colors.Info

@@ -4,4 +4,4 @@
 
 # Original command with additional arguments support
 $fullCommand = "chater-adapt | chater-bom"
-& $fullCommand @args
+Invoke-Expression $fullCommand @args

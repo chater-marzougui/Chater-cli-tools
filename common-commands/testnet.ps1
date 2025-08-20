@@ -4,4 +4,4 @@
 
 # Original command with additional arguments support
 $fullCommand = "ping google.com"
-& $fullCommand @args
+Invoke-Expression $fullCommand @args
