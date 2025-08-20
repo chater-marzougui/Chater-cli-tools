@@ -472,7 +472,6 @@ function Show-TokenUsage {
             Write-Host "📊 No usage data found yet!" -ForegroundColor Yellow
             return
         }
-        Write-Host $content
         $usage = ($content | ConvertFrom-Json).PSObject.Properties
         if ($usage.Count -eq 0) {
             Write-Host "📊 No usage data found yet!" -ForegroundColor Yellow

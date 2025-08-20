@@ -3,3 +3,4 @@
 cmd-wrappers/
 helpers/*.json
 helpers/*.txt
+helpers/.secrets
