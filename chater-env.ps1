@@ -18,12 +18,13 @@ function Show-Help {
     Write-Host "  Perfect for managing API keys, paths, and other settings per project."
     Write-Host ""
     Write-Host "USAGE:" -ForegroundColor Yellow
-    Write-Host "  chater-env set <name> <value>          # Set an environment variable" -ForegroundColor Green
-    Write-Host "  chater-env get <name>                  # Get an environment variable" -ForegroundColor Green
-    Write-Host "  chater-env list                        # List all stored variables" -ForegroundColor Green
-    Write-Host "  chater-env create		         # Creates empty .env file" -ForegroundColor Green
-    Write-Host "  chater-env -h                          # Show this help message" -ForegroundColor Green
-    Write-Host "  chater-env help                        # Show this help message" -ForegroundColor Green
+    Write-Host "  chater-env set <name> <value>    # Set or Update an environment variable" -ForegroundColor Green
+    Write-Host "  chater-env get <name>            # Get an environment variable" -ForegroundColor Green
+    Write-Host "  chater-env delete <name>         # Delete an environment variable" -ForegroundColor Green
+    Write-Host "  chater-env list                  # List all stored variables" -ForegroundColor Green
+    Write-Host "  chater-env create		           # Creates empty .env file" -ForegroundColor Green
+    Write-Host "  chater-env -h                    # Show this help message" -ForegroundColor Green
+    Write-Host "  chater-env help                  # Show this help message" -ForegroundColor Green
     Write-Host ""
     if ($isSmall) {
         return
