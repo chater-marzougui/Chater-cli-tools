@@ -277,15 +277,6 @@ function Remove-EnvVariable {
     Write-Host "❌ No variable found with name '$Name'" -ForegroundColor Red
 }
 
-# Alias for consistency
-function Delete-EnvVariable {
-    param(
-        [string]$Name,
-        [switch]$Force
-    )
-    Remove-EnvVariable -Name $Name -Force:$Force
-}
-
 function Show-EnvVariables {
     $envVars = Read-EnvFile
     $envFile = Get-EnvFilePath
@@ -367,7 +358,7 @@ try {
             }
             $forceArgs = @("-force", "--force", "-f", "--f")
             $force = $forceArgs -contains $Arguments[-1]
-            Delete-EnvVariable -Name $Arguments[1] -Force:$force
+            Remove-EnvVariable -Name $Arguments[1] -Force:$force
         }
 
         "create" {
