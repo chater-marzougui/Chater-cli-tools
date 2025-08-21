@@ -213,7 +213,7 @@ cp example.env .env
 2. **Add your API keys** (optional):
 ```env
 GEMINI_API_KEY=your_api_key_here
-MainScriptsPath=C:\custom-scripts
+MAIN_SCRIPTS_PATH=C:\custom-scripts
 ```
 
 <div align="right">
@@ -393,7 +393,7 @@ The tools use a `.env` file for configuration:
 GEMINI_API_KEY=your_gemini_api_key_here
 
 # Paths
-MainScriptsPath=C:\custom-scripts
+MAIN_SCRIPTS_PATH=C:\custom-scripts
 ```
 
 ### Getting API Keys

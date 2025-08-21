@@ -13,7 +13,7 @@ $AUTHOR_CREDIT = "Made by Chater Marzougui"
 $STAR_MESSAGE = "please give a star at : $GITHUB_LINK"
 
 $envFilePath = Join-Path $PSScriptRoot ".env"
-$scriptDir = (Get-Content $envFilePath | Where-Object { $_ -match "^MainScriptsPath=" }) -replace "MainScriptsPath=", ""
+$scriptDir = (Get-Content $envFilePath | Where-Object { $_ -match "^MAIN_SCRIPTS_PATH=" }) -replace "MAIN_SCRIPTS_PATH=", ""
 if (-Not $scriptDir) { $scriptDir = "C:\custom-scripts" } else { $scriptDir = $scriptDir.Trim().Trim('"').Trim("'") }
 
 function Show-Help {
@@ -219,23 +219,23 @@ function Initialize-EnvFile {
     # Read current .env content
     $envContent = Get-Content $envPath
     
-    # Update MainScriptsPath if provided
+    # Update MAIN_SCRIPTS_PATH if provided
     if ($PreferredPath) {
         $updatedContent = @()
         $pathUpdated = $false
         
         foreach ($line in $envContent) {
-            if ($line -match "^MainScriptsPath=") {
-                $updatedContent += "MainScriptsPath=$PreferredPath"
+            if ($line -match "^MAIN_SCRIPTS_PATH=") {
+                $updatedContent += "MAIN_SCRIPTS_PATH=$PreferredPath"
                 $pathUpdated = $true
             } else {
                 $updatedContent += $line
             }
         }
         
-        # If MainScriptsPath line wasn't found, add it
+        # If MAIN_SCRIPTS_PATH line wasn't found, add it
         if (-not $pathUpdated) {
-            $updatedContent += "MainScriptsPath=$PreferredPath"
+            $updatedContent += "MAIN_SCRIPTS_PATH=$PreferredPath"
         }
         
         # Write updated content back to .env
@@ -245,7 +245,7 @@ function Initialize-EnvFile {
     }
     
     # Return current path from .env
-    $currentPath = ($envContent | Where-Object { $_ -match "^MainScriptsPath=" }) -replace "MainScriptsPath=", ""
+    $currentPath = ($envContent | Where-Object { $_ -match "^MAIN_SCRIPTS_PATH=" }) -replace "MAIN_SCRIPTS_PATH=", ""
     if ($currentPath) {
         return $currentPath.Trim().Trim('"').Trim("'")
     }

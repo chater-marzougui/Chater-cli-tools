@@ -24,7 +24,7 @@ function Get-EnvVariable {
 }
 
 # Get script directory
-$ScriptsDir = Get-EnvVariable "MainScriptsPath"
+$ScriptsDir = Get-EnvVariable "MAIN_SCRIPTS_PATH"
 $HelpersDir = Join-Path $ScriptsDir "helpers"
 $logsDir = Join-Path $ScriptsDir "logs"
 $STDOUTFile = Join-Path $logsDir "STDOUT.txt"

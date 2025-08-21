@@ -6,7 +6,7 @@
 
 
 $envFilePath = Join-Path $PSScriptRoot ".env"
-$scriptDir = (Get-Content $envFilePath | Where-Object { $_ -match "^MainScriptsPath=" }) -replace "MainScriptsPath=", ""
+$scriptDir = (Get-Content $envFilePath | Where-Object { $_ -match "^MAIN_SCRIPTS_PATH=" }) -replace "MAIN_SCRIPTS_PATH=", ""
 if (-Not $scriptDir) { $scriptDir = "C:\custom-scripts" } else { $scriptDir = $scriptDir.Trim().Trim('"').Trim("'") }
 $secretsFilePath = Join-Path $scriptDir "helpers\.secrets"
 
@@ -222,8 +222,9 @@ function Get-Secret {
        $decryptedValue = Unprotect-String -EncryptedText $encryptedValue
 
        if ($decryptedValue) {
-           Write-Host "🎯 Found match: " -NoNewline -ForegroundColor Yellow
-           Write-Host "$matchedName = $decryptedValue" -ForegroundColor Green
+           Write-Host "$matchedName=$decryptedValue" -ForegroundColor Green
+           "$matchedName=$decryptedValue" | Set-Clipboard
+            Write-Host "✅ Copied to clipboard" -ForegroundColor DarkGray
        }
        return
    }
@@ -259,7 +260,9 @@ function Get-Secret {
 
            if ($decryptedValue) {
                Write-Host ""
-               Write-Host "$selectedName = $decryptedValue" -ForegroundColor Green
+               Write-Host "$selectedName=$decryptedValue" -ForegroundColor Green
+               "$selectedName=$decryptedValue" | Set-Clipboard
+                Write-Host "✅ Copied to clipboard" -ForegroundColor DarkGray
            }
        } else {
            Write-Host "❌ Invalid selection. Please choose a number between 1 and $($matches.Count)" -ForegroundColor Red
@@ -290,18 +293,26 @@ function Show-Secrets {
     $apiKeys = @()
     $tokens = @()
     $passwords = @()
+    $configs = @()
+    $paths = @()
     $others = @()
     
     $sortedKeys = $secrets.Keys | Sort-Object
     foreach ($key in $sortedKeys) {
-        if ($key -match "API_KEY|APIKEY") {
+        if ($key -match "API_KEY|APIKEY|api_key|apikey") {
             $apiKeys += $key
         }
-        elseif ($key -match "TOKEN|SECRET") {
+        elseif ($key -match "TOKEN|SECRET|token|secret") {
             $tokens += $key
         }
-        elseif ($key -match "PASSWORD|PASS|PWD") {
+        elseif ($key -match "PASSWORD|PASS|PWD|password|pass|pwd") {
             $passwords += $key
+        }
+        elseif ($key -match "KEY|CONFIG|config|key") {
+            $configs += $key
+        }
+        elseif ($key -match "PATH|path") {
+            $paths += $key
         }
         else {
             $others += $key
@@ -332,7 +343,23 @@ function Show-Secrets {
         }
         Write-Host ""
     }
-    
+
+    if ($configs.Count -gt 0) {
+        Write-Host "  ⚙️ Configurations:" -ForegroundColor Yellow
+        foreach ($key in $configs) {
+            Write-Host "     $key" -ForegroundColor White
+        }
+        Write-Host ""
+    }
+
+    if ($paths.Count -gt 0) {
+        Write-Host "  🛤️  Paths:" -ForegroundColor Yellow
+        foreach ($key in $paths) {
+            Write-Host "     $key" -ForegroundColor White
+        }
+        Write-Host ""
+    }
+
     if ($others.Count -gt 0) {
         Write-Host "  📋 Other Secrets:" -ForegroundColor Yellow
         foreach ($key in $others) {
@@ -405,10 +432,62 @@ function Export-Secrets {
     $lines += "# Exported secrets from chater-secrets"
     $lines += "# Generated on $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
     $lines += ""
+
+    
+    if (Test-Path $envFile) {
+        # Read the file and append it to lines
+        $genericPatterns = @(
+            '^#\s*Existing secrets:',
+            '^#\s*New secrets:',
+            '^#\s*Exported secrets from',
+            '^#\s*Generated on'
+        )
+        $existingLines = Get-Content $envFile
+        $lines += "# Existing secrets:"
+        foreach ($line in $existingLines) {
+            if ($line -and $line.Trim()) {
+                # Skip only generic comments, keep user comments
+                if ($line.StartsWith("#")) {
+                    if ($genericPatterns | Where-Object { $line -match $_ }) {
+                        continue
+                    }
+                }
+                $lines += $line
+            }
+        }
+        $lines += ""
+        $lines += "# New secrets:"
+    }
     
     # Decrypt and export each secret
     $sortedKeys = $secrets.Keys | Sort-Object
+    $newLines = 0
     foreach ($key in $sortedKeys) {
+        # Find matching line in .env if it exists
+        $envLine = $existingLines | Where-Object { $_ -match "^\s*$key\s*=" }
+        if ($envLine) {
+            # Extract value from .env
+            $envValue = ($envLine -split '=', 2)[1].Trim('"')
+
+            # Decrypt stored secret
+            $encryptedValue = $secrets[$key]
+            $decryptedValue = Unprotect-String -EncryptedText $encryptedValue
+
+            # Compare values
+            if ($decryptedValue -ne $envValue) {
+                Write-Host "⚠️  Value mismatch for key '$key'" -ForegroundColor Yellow
+                Write-Host "    .env file:      $envValue" -ForegroundColor Gray
+                Write-Host "    Secrets vault:  $decryptedValue" -ForegroundColor Gray
+                Write-Host "    ➜ Please delete/update one of them." -ForegroundColor Red
+                Write-Host "    ➜ chater-secrets delete $key # to delete from secrets vault" -ForegroundColor Red
+                Write-Host "    ➜ chater-env delete $key # to delete from .env file" -ForegroundColor Red
+            }
+
+            continue
+        }
+
+        # If not in .env, add new line
+        $newLines++
         $encryptedValue = $secrets[$key]
         $decryptedValue = Unprotect-String -EncryptedText $encryptedValue
         
@@ -421,14 +500,21 @@ function Export-Secrets {
             }
         }
     }
+
+
+    if ($newLines -eq 0) {
+        if ($existingLines.Count -eq 0) {
+            Write-Host "No new secrets to export" -ForegroundColor Yellow
+        } else {
+            Write-Host "All existing secrets already exported" -ForegroundColor Green
+        }
+        return
+    }
     
     try {
         $lines | Out-File -FilePath $envFile -Encoding UTF8
-        Write-Host "✅ Exported $($secrets.Count) secrets to .env file" -ForegroundColor Green
+        Write-Host "✅ Exported $newLines secrets to .env file" -ForegroundColor Green
         Write-Host "Location: $envFile" -ForegroundColor Gray
-        Write-Host ""
-        Write-Host "⚠️  WARNING: .env file contains plaintext secrets!" -ForegroundColor Red
-        Write-Host "   Make sure it's in your .gitignore file" -ForegroundColor Red
     }
     catch {
         Write-Host "❌ Error exporting secrets: $($_.Exception.Message)" -ForegroundColor Red
