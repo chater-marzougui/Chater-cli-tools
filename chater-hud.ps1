@@ -268,17 +268,19 @@ function Get-NetworkInfo {
         # Test connectivity - try multiple methods
         $connectivity = $false
         
-        # Method 1: Test-Connection to Google DNS
+        # Method 3: Try an HTTP request
         try {
-            $connectivity = Test-Connection -ComputerName 8.8.8.8 -Count 1 -Quiet -TimeoutSeconds 3 -ErrorAction SilentlyContinue
+            $response = Invoke-WebRequest -Uri "https://www.google.com" -UseBasicParsing -TimeoutSec 3 -ErrorAction Stop
+            $connectivity = $response.StatusCode -eq 200
         } catch {
             $connectivity = $false
         }
+
         
         # Method 2: If first test fails, try Cloudflare DNS
         if (-not $connectivity) {
             try {
-                $connectivity = Test-Connection -ComputerName 1.1.1.1 -Count 1 -Quiet -TimeoutSeconds 3 -ErrorAction SilentlyContinue
+                $connectivity = Test-Connection -ComputerName 1.1.1.1 -Count 1 -Quiet -ErrorAction SilentlyContinue
             } catch {
                 $connectivity = $false
             }
@@ -377,7 +379,6 @@ function Show-CyberHUD {
         
         foreach ($interface in $netInfo.Interfaces | Select-Object -First 2) {
             Write-Host "    └- $($interface.Name): $($interface.IP) [$($interface.Speed)]" -ForegroundColor Gray
-            Write-Host "        Sent: $($interface.BytesSent)MB  Recv: $($interface.BytesReceived)MB" -ForegroundColor DarkGray
         }
     } else {
         Write-Host " ⚠️   $($netInfo.Status)" -ForegroundColor Red
