@@ -24,7 +24,7 @@ Built with ❤️ by [Chater Marzougui](https://github.com/chater-marzougui).
   </a>
   <h3>Chater CLI Tools</h3>
   <p align="center">
-    <strong>11 powerful CLI utilities in one package</strong>
+    <strong>15 powerful CLI utilities in one package</strong>
     <br />
     <br />
     <a href="https://github.com/chater-marzougui/Chater-cli-tools/issues/new?labels=bug&template=bug-report---.md">Report Bug</a>
@@ -71,7 +71,7 @@ From AI-powered assistance and Git automation to system monitoring and port mana
 
 ### 🎯 Key Features
 
-- 🔧 **11 Specialized Tools** covering development, system administration, and productivity
+- 🔧 **15 Specialized Tools** covering development, system administration, and productivity
 - 🤖 **AI Integration** with Google Gemini for instant assistance
 - ⚡ **Automated Workflows** for Git operations and script management
 - 📊 **System Monitoring** with cyberpunk-style HUD interface
@@ -154,7 +154,7 @@ yourname-port scan 3000-3010
 ## 🔧 Installation
 
 ### Prerequisites
-- Windows 10/11 with PowerShell 5.1+
+- Windows 10/15 with PowerShell 5.1+
 - Administrator privileges (for PATH modification)
 - Internet connection (for AI features)
 
@@ -507,7 +507,7 @@ yourname-bom
 ## 📋 Requirements
 
 ### System Requirements
-- **OS**: Windows 10/11
+- **OS**: Windows 10/15
 - **PowerShell**: yes
 - **RAM**: Some ram
 - **Storage**: not really
