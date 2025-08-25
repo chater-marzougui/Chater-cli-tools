@@ -79,7 +79,9 @@ function Create_Command {
 
     Ensure_DirectoryExists
 
-    if (-not (Test-Command $commandName)) {
+    $mainCommand = $commandName.split(' ')[0]
+
+    if (-not (Test-Command $mainCommand)) {
         Write-Host "Error: Command '$commandName' not found." -ForegroundColor Red
         return
     }
@@ -91,16 +93,44 @@ function Create_Command {
 
     $scriptPath = Join-Path $commonScriptDir "$targetCommand.ps1"
 
-    # Create script content with parameter support
-    $scriptContent = @"
+    # Create script content with proper parameter handling
+    # Check if command contains CMD operators that need special handling
+    $needsCmdExecution = $commandName -match '&&|\|\||&(?!\s*\$)'
+    
+    if ($needsCmdExecution) {
+        $scriptContent = @"
 # Auto-generated script for: $targetCommand
 # Original command: $commandName
 # Generated on: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
 
-# Original command with additional arguments support
-`$fullCommand = "$commandName"
-Invoke-Expression `$fullCommand @args
+# Execute CMD command with arguments
+if (`$args.Count -gt 0) {
+    `$argumentString = `$args -join ' '
+    `$fullCommand = "$commandName `$argumentString"
+} else {
+    `$fullCommand = "$commandName"
+}
+
+# Use cmd.exe to execute commands with CMD operators
+cmd.exe /c "`$fullCommand"
 "@
+    } else {
+        $scriptContent = @"
+# Auto-generated script for: $targetCommand
+# Original command: $commandName
+# Generated on: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+
+# Pass all arguments to the original command
+if (`$args.Count -gt 0) {
+    `$argumentString = `$args -join ' '
+    `$fullCommand = "$commandName `$argumentString"
+} else {
+    `$fullCommand = "$commandName"
+}
+
+Invoke-Expression `$fullCommand
+"@
+    }
 
     try {
         Set-Content -Path $scriptPath -Value $scriptContent -Encoding UTF8

@@ -1,7 +1,13 @@
 ﻿# Auto-generated script for: ask
 # Original command: chater-ask
-# Generated on: 2025-08-19 00:38:20
+# Generated on: 2025-08-26 00:00:58
 
-# Original command with additional arguments support
-$fullCommand = "chater-ask"
-& $fullCommand @args
+# Pass all arguments to the original command
+if ($args.Count -gt 0) {
+    $argumentString = $args -join ' '
+    $fullCommand = "chater-ask $argumentString"
+} else {
+    $fullCommand = "chater-ask"
+}
+
+Invoke-Expression $fullCommand
