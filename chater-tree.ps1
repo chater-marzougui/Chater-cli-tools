@@ -291,11 +291,7 @@ Write-Host ""
 
 # Show summary
 $totalItems = (Get-ChildItem -Path $resolvedPath -Recurse -Force | Measure-Object).Count
-Write-Host "📊 Summary: $totalItems items found" -ForegroundColor Cyan
-Write-Host "📊 Summary: $Global:shownItemsCount items found" -ForegroundColor Cyan
-
-Write-Host "📊 Summary: $Global:shownItemsCount items shown" -ForegroundColor Cyan
+Write-Host "📊 Summary: $Global:shownItemsCount/$totalItems items shown" -ForegroundColor Cyan
 if (-not $ShowAll -and $totalItems -gt $Global:shownItemsCount) {
-    Write-Host "   ($($totalItems - $Global:shownItemsCount) items filtered out)" -ForegroundColor Gray
+    Write-Host "  🧹 ($($totalItems - $Global:shownItemsCount) items filtered out)" -ForegroundColor DarkGray
 }
-Write-Host ""
