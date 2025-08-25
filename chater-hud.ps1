@@ -1,520 +1,562 @@
 ﻿param(
-    [Parameter(Position = 0)]
-    [string]$Command,
-
-    [Parameter(ValueFromRemainingArguments = $true)]
-    [string[]]$Arguments,
-
-    [switch]$Help
+    [Parameter(ValueFromRemainingArguments=$true)]
+    [string[]]$Arguments
 )
 
 
-# Cyber-themed banner
-function Show-CyberBanner {
-    $banner = @"
-    ╔══════════════════════════════════════════════════════════════════════════════════════════════╗
-    ║  ▄▄▄▄▄▄▄▄▄▄▄  ▄         ▄             ▄        ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄  ▄▄▄▄▄▄▄▄▄▄▄  ▄▄▄▄▄▄▄▄▄▄▄   ║
-    ║ ▐░░░░░░░░░░░▌▐░▌       ▐░▌          █░░░█      █░░░░░░░░░░░░░░░█ ▐░░░░░░░░░░░▌▐░░░░░░░░░░░▌  ║
-    ║ ▐░█▀▀▀▀▀▀▀▀▀ ▐░▌       ▐░▌         █░░█░░█     ▀▀▀▀▀▀█░░█▀▀▀▀▀▀▀ ▐░█▀▀▀▀▀▀▀▀▀ ▐░█▀▀▀▀▀▀▀█░▌  ║
-    ║ ▐░▌          ▐░▌       ▐░▌        █░░   ░░█          █░░█        ▐░▌          ▐░▌       ▐░▌  ║
-    ║ ▐░▌          ▐░█▄▄▄▄▄▄▄█░▌       █░░     ░░█         █░░█        ▐░█▄▄▄▄▄▄▄▄▄ ▐░█▄▄▄▄▄▄▄█░▌  ║
-    ║ ▐░▌          ▐░░░░░░░░░░░▌      █░░       ░░█        █░░█        ▐░░░░░░░░░░░▌▐░░░░░░░░░░░▌  ║
-    ║ ▐░▌          ▐░█▀▀▀▀▀▀▀█░▌     █░░░████████░░█       █░░█        ▐░█▀▀▀▀▀▀▀▀▀ ▐░█▀▀▀▀█░█▀▀   ║
-    ║ ▐░▌          ▐░▌       ▐░▌    █░░           ░░█      █░░█        ▐░▌          ▐░▌     ▐░▌    ║
-    ║ ▐░█▄▄▄▄▄▄▄▄▄ ▐░▌       ▐░▌   █░░             ░░█     █░░█        ▐░█▄▄▄▄▄▄▄▄▄ ▐░▌      ▐░▌   ║
-    ║ ▐░░░░░░░░░░░▌▐░▌       ▐░▌  █░░               ░░█    █░░█        ▐░░░░░░░░░░░▌▐░▌       ▐░▌  ║
-    ║  ▀▀▀▀▀▀▀▀▀▀▀  ▀         ▀   ▀▀▀               ▀▀▀    ▀▀▀▀         ▀▀▀▀▀▀▀▀▀▀▀  ▀         ▀   ║
-    ║                                       SYSTEM MONITOR v2.0                                    ║
-    ╚══════════════════════════════════════════════════════════════════════════════════════════════╝
-"@
-    Write-Host $banner -ForegroundColor Cyan
+$envFilePath = Join-Path $PSScriptRoot ".env"
+$scriptDir = (Get-Content $envFilePath | Where-Object { $_ -match "^MAIN_SCRIPTS_PATH=" }) -replace "MAIN_SCRIPTS_PATH=", ""
+if (-Not $scriptDir) { $scriptDir = "C:\custom-scripts" } else { $scriptDir = $scriptDir.Trim().Trim('"').Trim("'") }
+$helpers = Join-Path $scriptDir "helpers\hud-functions.ps1"
+$logFile = Join-Path $scriptDir "logs\system-monitor.log"
+. $helpers
+
+# Professional System Monitor Configuration
+$Script:Config = @{
+    RefreshInterval = 5000  # Milliseconds
+    AlertThresholds = @{
+        CPU = 85
+        Memory = 90
+        Disk = 95
+        Temperature = 75
+    }
+    LogFile = $logFile
+    MaxLogSize = 10MB
+    UpdateOnlyChanged = $true
 }
 
-function Show-Help {
+# State tracking for selective updates
+$Script:LastState = @{}
+$Script:LinePositions = @{}
+$Script:IsInitialized = $false
+
+Add-Type -AssemblyName "System.Net.Http"
+
+#region Helper Functions
+function Write-Log {
     param(
-        [bool]$Small
+        [string]$Message,
+        [ValidateSet('INFO', 'WARN', 'ERROR', 'DEBUG')]
+        [string]$Level = 'INFO'
     )
+    
+    $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+    $logEntry = "[$timestamp] [$Level] $Message"
+    
+    try {
+        # Rotate log if it gets too large
+        if (Test-Path $Script:Config.LogFile) {
+            $logSize = (Get-Item $Script:Config.LogFile).Length
+            if ($logSize -gt $Script:Config.MaxLogSize) {
+                $backupLog = $Script:Config.LogFile -replace '\.log$', '-backup.log'
+                Move-Item $Script:Config.LogFile $backupLog -Force
+            }
+        }
+        
+        Add-Content -Path $Script:Config.LogFile -Value $logEntry -ErrorAction SilentlyContinue
+    }
+    catch {
+        # Silent fail for logging to avoid disrupting the main display
+    }
+}
+
+function Get-ProgressBar {
+    param(
+        [double]$Percentage,
+        [int]$Width = 30,
+        [ValidateSet('Normal', 'Warning', 'Critical')]
+        [string]$Status = 'Normal'
+    )
+    
+    $filled = [math]::Min([math]::Round(($Percentage / 100) * $Width), $Width)
+    $empty = $Width - $filled
+    
+    $bar = switch ($Status) {
+        'Critical' { "█" * $filled + "░" * $empty }
+        'Warning'  { "▓" * $filled + "░" * $empty }
+        default    { "▓" * $filled + "░" * $empty }
+    }
+    
+    $color = switch ($Status) {
+        'Critical' { 'Red' }
+        'Warning'  { 'Yellow' }
+        default    { 'Green' }
+    }
+    
+    return @{
+        Bar = $bar
+        Color = $color
+        Text = "$($Percentage.ToString('00.0'))%"
+    }
+}
+
+function Update-ConsoleLine {
+    param(
+        [int]$Line,
+        [string]$Content,
+        [string]$Color = 'White'
+    )
+    
+    if (-not $Script:IsInitialized) { return }
+    
+    $currentPos = $Host.UI.RawUI.CursorPosition
+    if ($Line -ge $Host.UI.RawUI.WindowSize.Height) {
+        Write-Host ""  # This will naturally scroll the console
+        # $Line = $Host.UI.RawUI.WindowSize.Height - 1    
+    }
+    $Host.UI.RawUI.CursorPosition = @{ X = 0; Y = $Line }
+    
+    # Clear the line
+    Write-Host (' ' * $Host.UI.RawUI.WindowSize.Width) -NoNewline
+    $Host.UI.RawUI.CursorPosition = @{ X = 0; Y = $Line }
+    
+    # Write new content
+    Write-Host $Content -ForegroundColor $Color -NoNewline
+    
+    # Restore cursor position
+    $Host.UI.RawUI.CursorPosition = $currentPos
+}
+
+#region Display Functions
+function Show-Header {
     Write-Host ""
-    Write-Host "CYBER HUD - Advanced System Monitoring Tool" -ForegroundColor Green
-    Write-Host "===========================================" -ForegroundColor Green
+    Write-Host "System Monitor" -ForegroundColor Blue
+    Write-Host ("=" * 50) -ForegroundColor DarkBlue
+    Write-Host ""
+    Write-Host ""
+}
+
+function Show-SystemStatus {
+    param([hashtable]$Metrics, [int]$StartLine)
+    
+    $line = $StartLine
+    $Script:LinePositions['SystemHeader'] = $line
+    
+    if (-not $Script:IsInitialized -or (Compare-StateChange 'System' $Metrics)) {
+        Update-ConsoleLine $line "SYSTEM RESOURCES" 'Cyan'
+        $line++
+        Update-ConsoleLine $line ("-" * 40) 'DarkCyan'
+        $line++
+        
+        # CPU
+        $cpuStatus = if ($Metrics.CPU -gt $Script:Config.AlertThresholds.CPU) { 'Critical' } 
+                    elseif ($Metrics.CPU -gt 70) { 'Warning' } 
+                    else { 'Normal' }
+        
+        $cpuBar = Get-ProgressBar -Percentage $Metrics.CPU -Status $cpuStatus
+        Update-ConsoleLine $line ("CPU Usage    [{0}] {1}" -f $cpuBar.Bar, $cpuBar.Text) $cpuBar.Color
+        $line++
+        
+        # Memory
+        $memStatus = if ($Metrics.Memory.Percent -gt $Script:Config.AlertThresholds.Memory) { 'Critical' }
+                    elseif ($Metrics.Memory.Percent -gt 75) { 'Warning' }
+                    else { 'Normal' }
+        
+        $memBar = Get-ProgressBar -Percentage $Metrics.Memory.Percent -Status $memStatus
+        $memText = "Memory Usage [{0}] {1} ({2:N1}/{3:N1} GB)" -f $memBar.Bar, $memBar.Text, $Metrics.Memory.Used, $Metrics.Memory.Total
+        Update-ConsoleLine $line $memText $memBar.Color
+        $line++
+        
+        # Disk
+        if ($Metrics.Disk) {
+            $diskStatus = if ($Metrics.Disk.Percent -gt $Script:Config.AlertThresholds.Disk) { 'Critical' }
+                         elseif ($Metrics.Disk.Percent -gt 80) { 'Warning' }
+                         else { 'Normal' }
+            
+            $diskBar = Get-ProgressBar -Percentage $Metrics.Disk.Percent -Status $diskStatus
+            $diskText = "Disk Usage   [{0}] {1} ({2:N1}/{3:N1} GB)" -f $diskBar.Bar, $diskBar.Text, $Metrics.Disk.Used, $Metrics.Disk.Total
+            Update-ConsoleLine $line $diskText $diskBar.Color
+            $line++
+        }
+        
+        # Temperature
+        if ($Metrics.Temperature) {
+            $tempStatus = if ($Metrics.Temperature -gt $Script:Config.AlertThresholds.Temperature) { 'Critical' }
+                         elseif ($Metrics.Temperature -gt 60) { 'Warning' }
+                         else { 'Normal' }
+            
+            $tempBar = Get-ProgressBar -Percentage ($Metrics.Temperature * 1.25) -Status $tempStatus -Width 20
+            $tempText = "Temperature  [{0}] {1:N1}°C" -f $tempBar.Bar, $Metrics.Temperature
+            Update-ConsoleLine $line $tempText $tempBar.Color
+            $line++
+        }
+        
+        # Uptime
+        $uptimeText = "Uptime: {0}d {1}h {2}m ({3:N1} total hours)" -f $Metrics.Uptime.Days, $Metrics.Uptime.Hours, $Metrics.Uptime.Minutes, $Metrics.Uptime.TotalHours
+        Update-ConsoleLine $line $uptimeText 'Gray'
+        $line++
+        
+        Update-ConsoleLine $line "" 'White'
+        $line++
+    }
+    
+    return $line
+}
+
+function Show-NetworkStatus {
+    param([hashtable]$Network, [int]$StartLine)
+    
+    $line = $StartLine
+    
+    if (-not $Script:IsInitialized -or (Compare-StateChange 'Network' $Network)) {
+        Update-ConsoleLine $line "NETWORK STATUS" 'Cyan'
+        $line++
+        Update-ConsoleLine $line ("-" * 40) 'DarkCyan'
+        $line++
+        
+        # Internet connectivity
+        $internetIcon = if ($Network.InternetConnected) { "✓" } else { "✗" }
+        $internetColor = if ($Network.InternetConnected) { "Green" } else { "Red" }
+        $internetText = "Internet Connection: {0} {1}" -f $internetIcon, $(if($Network.InternetConnected) {"Connected"} else {"Disconnected"})
+        Update-ConsoleLine $line $internetText $internetColor
+        $line++
+        
+        # Active interfaces
+        $interfaceText = "Active Interfaces: {0}" -f $Network.Interfaces.Count
+        Update-ConsoleLine $line $interfaceText 'White'
+        $line++
+        
+        # Interface details
+        foreach ($interface in $Network.Interfaces | Select-Object -First 3) {
+            $pro = if ($interface.Status -eq "Up") { "✓" } else { "✗" }
+            $pred = if($interface -eq $Network.Interfaces[2]) { "└─" } else { "├─" }
+            $interfaceDetail = "  {0} {1}: {2} [{3}] {4}" -f $pred, $interface.Name, $interface.IP, $interface.Speed, $pro
+            Update-ConsoleLine $line $interfaceDetail 'Gray'
+            $line++
+        }
+        
+        Update-ConsoleLine $line "" 'White'
+        $line++
+    }
+    
+    return $line
+}
+
+function Show-ProcessStatus {
+    param([array]$Processes, [int]$StartLine)
+    
+    $line = $StartLine
+    
+    if (-not $Script:IsInitialized -or (Compare-StateChange 'Processes' $Processes)) {
+        Update-ConsoleLine $line "TOP PROCESSES" 'Cyan'
+        $line++
+        Update-ConsoleLine $line ("-" * 40) 'DarkCyan'
+        $line++
+        
+        foreach ($proc in $Processes) {
+            $shownPIDs = $proc.PID.Split(",")[0..([math]::Min(2, ($proc.PID.Split(",").Count - 1)))] -join ","
+            $procText = "{0,-20} CPU: {1,6:N1}% RAM: {2,6:N1}MB PID: {3}" -f $proc.Name, ($proc.CPU / 10000), $proc.Memory, $shownPIDs
+            Update-ConsoleLine $line $procText 'White'
+            $line++
+        }
+        
+        Update-ConsoleLine $line "" 'White'
+        $line++
+    }
+    
+    return $line
+}
+
+function Show-DevelopmentStatus {
+    param([hashtable]$Development, [int]$StartLine)
+    
+    $line = $StartLine
+    
+    if (-not $Script:IsInitialized -or (Compare-StateChange 'Development' $Development)) {
+        Update-ConsoleLine $line "DEVELOPMENT ENVIRONMENT" 'Cyan'
+        $line++
+        Update-ConsoleLine $line ("-" * 40) 'DarkCyan'
+        $line++
+        
+        # Git status
+        if ($Development.Git.Status -ne "Not a Git repository") {
+            $gitIcon = if ($Development.Git.Status -eq "Clean") { "✓" } else { "⚡" }
+            $gitColor = if ($Development.Git.Status -eq "Clean") { "Green" } else { "Yellow" }
+            $gitText = "Git Repository: {0} {1}" -f $gitIcon, $Development.Git.Status
+            Update-ConsoleLine $line $gitText $gitColor
+            $line++
+            
+            if ($Development.Git.Branch) {
+                $branchText = "  Branch: {0}" -f $Development.Git.Branch
+                Update-ConsoleLine $line $branchText 'Gray'
+                $line++
+            }
+            
+            if ($Development.Git.Changes -gt 0) {
+                $changesText = "  Uncommitted Changes: {0}" -f $Development.Git.Changes
+                Update-ConsoleLine $line $changesText 'Yellow'
+                $line++
+            }
+        } else {
+            Update-ConsoleLine $line "Git Repository: Not initialized" 'Gray'
+            $line++
+        }
+        
+        # Docker status
+        if ($Development.Docker.Status -eq "Running") {
+            $dockerText = "Docker: Running ({0} containers)" -f $Development.Docker.Containers
+            $dockerColor = if ($Development.Docker.Containers -gt 0) { "Green" } else { "Yellow" }
+            Update-ConsoleLine $line $dockerText $dockerColor
+            $line++
+        } else {
+            Update-ConsoleLine $line "Docker: Not available" 'Gray'
+            $line++
+        }
+        
+        # Runtime environments
+        if ($Development.Node.Status -eq "Installed") {
+            $nodeText = "Node.js: {0}" -f $Development.Node.Version
+            Update-ConsoleLine $line $nodeText 'Green'
+            $line++
+        }
+        
+        if ($Development.Python.Status -eq "Installed") {
+            $pythonText = "Python: {0}" -f $Development.Python.Version
+            Update-ConsoleLine $line $pythonText 'Green'
+            $line++
+        }
+        
+        Update-ConsoleLine $line "" 'White'
+        $line++
+    }
+    
+    return $line
+}
+
+function Show-Footer {
+    param([int]$StartLine, [bool]$isFirst)
+    
+    $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+    $footerText = "Time: {0} | Refresh: {1}ms | Press Ctrl+C to exit" -f $timestamp, $Script:Config.RefreshInterval
+
+    if($isFirst) {
+        Update-ConsoleLine $StartLine ("-" * 60) 'DarkGray'
+    }
+    Update-ConsoleLine ($StartLine + 1) $footerText 'DarkGray'
+}
+
+function Compare-StateChange {
+    param([string]$Section, $CurrentData)
+    
+    if (-not $Script:Config.UpdateOnlyChanged) {
+        return $true
+    }
+    
+    $currentJson = $CurrentData | ConvertTo-Json -Compress -Depth 10
+    $lastJson = $Script:LastState[$Section]
+    
+    if ($currentJson -ne $lastJson) {
+        $Script:LastState[$Section] = $currentJson
+        return $true
+    }
+    
+    return $false
+}
+#endregion
+
+#region Help and Main Functions
+function Show-Help {
+    param([bool]$Small = $false)
+    
+    Write-Host ""
+    Write-Host "System Monitor - Professional Edition" -ForegroundColor Blue
+    Write-Host "====================================" -ForegroundColor Blue
     Write-Host ""
     Write-Host "DESCRIPTION:" -ForegroundColor Yellow
-    Write-Host "  Real-time system monitoring dashboard with cyberpunk aesthetics."
-    Write-Host "  Monitors CPU, memory, disk usage, network status, security, and development tools."
+    Write-Host "  Professional real-time system monitoring tool with selective updates."
+    Write-Host "  Monitors system resources, network, security, and development environment."
     Write-Host ""
     Write-Host "USAGE:" -ForegroundColor Yellow
-    Write-Host "  chater-hud.ps1                    # Start monitoring with default settings"
-    Write-Host "  chater-hud.ps1 -Help              # Show this help message"
-    Write-Host "  chater-hud.ps1 h                  # Show this help message"
+    Write-Host "  chater-hud                       # Start system monitor" -ForegroundColor Green
+    Write-Host "  chater-hud help                  # Show this help message" -ForegroundColor Green
+    Write-Host "  chater-hud -h                    # Show this help message" -ForegroundColor Green
     Write-Host ""
-    if ($Small) {
-        return
-    }
+    
+    if ($Small) { return }
+    
     Write-Host "FEATURES:" -ForegroundColor Yellow
-    Write-Host "  📊 SYSTEM VITALS"
-    Write-Host "     • CPU usage alerts"
-    Write-Host "     • Memory consumption"
-    Write-Host "     • Disk space"
-    Write-Host "     • System temperature"
+    Write-Host "  • Real-time system metrics (CPU, Memory, Disk)"
+    Write-Host "  • Network interface monitoring"
+    Write-Host "  • Security status (Windows Defender, Firewall)"
+    Write-Host "  • Development environment detection"
+    Write-Host "  • Top process monitoring"
+    Write-Host "  • Selective line updates (no full screen refresh)"
+    Write-Host "  • Professional logging system"
     Write-Host ""
-    Write-Host "  🌐 NETWORK STATUS"
+    Write-Host "CONTROLS:" -ForegroundColor Yellow
+    Write-Host "  Ctrl+C                           # Exit monitor"
     Write-Host ""
-    Write-Host "  🛡️ SECURITY MONITORING"
+    Write-Host "LOG FILE:" -ForegroundColor Yellow
+    Write-Host "  Location: $($Script:Config.LogFile)"
+    Write-Host "  Max Size: $($Script:Config.MaxLogSize / 1MB)MB (auto-rotated)"
     Write-Host ""
-    Write-Host "  🔧 DEVELOPMENT TOOLS"
-    Write-Host "     • Git repo status, Docker container"
-    Write-Host ""
-    Write-Host "  ⚙️ PROCESS MONITORING"
 }
 
-if ($Help -or $Command -eq "h" -or $Command -eq "-h") {
-    $isSmall = $Arguments -contains "--small" -or $Command -eq "--small"
-    Show-Help $isSmall
+function Start-SystemMonitor {
+    Write-Log "System Monitor started" 'INFO'
+    Clear-Host
+    Show-Header
+    
+    $Script:IsInitialized = $true
+    $lastNetworkLines = 0
+    $tempNetworkLines = 0
+    $lastDevLines = 0
+    $tempDevLines = 0
+    $isFirst = $true
+    $spinner = @('|','/','-','\')
+    $lineNumber = 4
+    $footerLine = -1
+
+    try {
+        while ($true) {
+            $currentLine = 6
+            # Collect all metrics# Start a background job to gather metrics
+            $job = Start-Job -ScriptBlock {
+                param($scriptPath)
+                . $scriptPath
+
+                $systemMetrics = Get-SystemMetrics
+                $networkMetrics = Get-NetworkMetrics
+                $processMetrics = Get-ProcessMetrics
+                $devMetrics = Get-DevelopmentMetrics
+
+                # Return all results as a single object
+                [PSCustomObject]@{
+                    System = $systemMetrics
+                    Network = $networkMetrics
+                    Process = $processMetrics
+                    Dev = $devMetrics
+                }
+            } -ArgumentList $helpers
+
+            # Spinner loop while job is running
+            $i = 0
+            while ($job.State -eq 'Running') {
+                $char = $spinner[$i % $spinner.Length]
+                Update-ConsoleLine $lineNumber $char "Yellow"
+                if (-not $isFirst) {
+                    Show-Footer $footerLine $isFirst
+                }
+                Start-Sleep -Milliseconds 100
+                $i++
+            }
+
+            # Get the job results and remove the job
+            $result = Receive-Job -Job $job
+            Remove-Job -Job $job
+
+            # Show final message
+            Update-ConsoleLine $lineNumber "✔" "Green"
+
+            # Now you can use the metrics
+            $systemMetrics = $result.System
+            $networkMetrics = $result.Network
+            $processMetrics = $result.Process
+            $devMetrics = $result.Dev
+            # Update System Status
+            $currentLine = Show-SystemStatus $systemMetrics $currentLine
+
+            # Update Network Status
+            $tempNetworkLines = Show-NetworkStatus $networkMetrics $currentLine
+            if ($tempNetworkLines -ne $currentLine) {
+                $lastNetworkLines = $tempNetworkLines - $currentLine
+            }
+            $currentLine += $lastNetworkLines
+
+            # Update Process Status
+            $currentLine = Show-ProcessStatus $processMetrics $currentLine
+
+            # Update Development Status
+            $tempDevLines = Show-DevelopmentStatus $devMetrics $currentLine
+            if ($tempDevLines -ne $currentLine) {
+                $lastDevLines = $tempDevLines - $currentLine
+            }
+            $currentLine += $lastDevLines
+
+            # Check for alerts
+            if ($systemMetrics.CPU -gt $Script:Config.AlertThresholds.CPU) {
+                Write-Log "HIGH CPU USAGE: $($systemMetrics.CPU)%" 'WARN'
+            }
+            
+            if ($systemMetrics.Memory.Percent -gt $Script:Config.AlertThresholds.Memory) {
+                Write-Log "HIGH MEMORY USAGE: $($systemMetrics.Memory.Percent)%" 'WARN'
+            }
+            
+            for ($i = 0; $i -lt $Script:Config.RefreshInterval / 500; $i++) {
+                Show-Footer $currentLine $isFirst
+                $footerLine = $currentLine
+                Start-Sleep -Milliseconds 500
+                $isFirst = $false
+            }
+        }
+        
+    } catch [System.OperationCanceledException] {
+        Write-Host "`n`nSystem Monitor stopped by user." -ForegroundColor Yellow
+        Write-Log "Monitor stopped by user" 'INFO'
+    } catch {
+        Write-Host "`n`nCritical Error: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Log "Critical error: $($_.Exception.Message)" 'ERROR'
+    } finally {
+        Write-Host "Shutting down system monitor..." -ForegroundColor Gray
+        Write-Log "System monitor shutdown complete" 'INFO'
+    }
+}
+#endregion
+
+#region Main Execution
+# Parse arguments
+$helpArgs = @("-h", "--h", "help", "-Help")
+
+if ($Arguments.Count -eq 0) {
+    Start-SystemMonitor
     return
 }
 
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$OutputEncoding = [System.Text.Encoding]::UTF8
-chcp 65001 | Out-Null 
-$RefreshRate = 10 # seconds
-$LogFile = "system_monitor.log"
-$AlertThreshold = @{
-    CPU = 80
-    Memory = 85
-    Disk = 90
-    Temperature = 70
+if ($helpArgs -contains $Arguments[0]) {
+    $isSmall = $Arguments -contains "--small"
+    Show-Help -Small $isSmall
+    return
 }
 
-
-# Enhanced progress bar
-function Show-ProgressBar {
-    param([double]$Percentage, [string]$Label, [int]$Width = 40, [string]$Color = "Green")
-    
-    $filled = [math]::Round(($Percentage / 100) * $Width)
-    $empty = $Width - $filled
-
-    $bar = "█" * $filled + "░" +  " " * $empty
-
-    $colorCode = "White"
-    if ($Color -eq "Red") { $colorCode = "Red" }
-    elseif ($Color -eq "Yellow") { $colorCode = "Yellow" }
-    elseif ($Color -eq "Green") { $colorCode = "Green" }
-    elseif ($Color -eq "Cyan") { $colorCode = "Cyan" }
-    elseif ($Color -eq "Magenta") { $colorCode = "Magenta" }
-    
-    Write-Host "  [$bar] $($Percentage.ToString("00.0"))% $Label" -ForegroundColor $colorCode
-}
-
-# System temperature (if available)
-function Get-SystemTemperature {
-    try {
-        $temp = Get-CimInstance -Namespace "root/wmi" -Class "MSAcpi_ThermalZoneTemperature" -ErrorAction SilentlyContinue
-        if ($temp) {
-            $celsius = ($temp.CurrentTemperature / 10) - 273.15
-            return [math]::Round($celsius, 1)
-        }
-    } catch {}
-    return $null
-}
-
-# Process monitoring
-function Get-TopProcesses {
-    return Get-Process | Sort-Object CPU -Descending | Select-Object -First 5 Name, CPU, WorkingSet
-}
-
-
-# Security checks
-
-# Security checks
-function Get-SecurityStatus {
-    $results = @{}
-    
-    # Windows Defender status
-    try {
-        $defender = Get-MpComputerStatus -ErrorAction SilentlyContinue
-        $results.AntivirusEnabled = $defender.AntivirusEnabled
-        $results.LastScan = $defender.AntivirusSignatureLastUpdated
-    } catch {
-        $results.AntivirusEnabled = "Unknown"
-        $results.LastScan = "Unknown"
+# Handle unknown commands
+$command = $Arguments[0].ToLower()
+switch ($command) {
+    "start" {
+        Start-SystemMonitor
     }
-    
-    # Firewall status
-    try {
-        $firewall = Get-NetFirewallProfile | Where-Object {$_.Enabled -eq $true}
-        $results.FirewallEnabled = ($firewall.Count -gt 0)
-    } catch {
-        $results.FirewallEnabled = "Unknown"
+    "config" {
+        Write-Host "Current Configuration:" -ForegroundColor Yellow
+        Write-Host "Refresh Interval: $($Script:Config.RefreshInterval) Ms"
+        Write-Host "Log File: $($Script:Config.LogFile)"
+        Write-Host "Alert Thresholds:"
+        Write-Host "  CPU: $($Script:Config.AlertThresholds.CPU)%"
+        Write-Host "  Memory: $($Script:Config.AlertThresholds.Memory)%"
+        Write-Host "  Disk: $($Script:Config.AlertThresholds.Disk)%"
+        Write-Host "  Temperature: $($Script:Config.AlertThresholds.Temperature)°C"
     }
-    
-    # Failed login attempts (last 24 hours)
-    try {
-        $since = (Get-Date).AddDays(-1)
-        $failedLogins = Get-WinEvent -FilterHashtable @{LogName='Security'; ID=4625; StartTime=$since} -ErrorAction SilentlyContinue -MaxEvents 10
-        if ($failedLogins) {
-            $results.FailedLogins = $failedLogins.Count
-        } else {
-            $results.FailedLogins = 0
-        }
-    } catch {
-        $results.FailedLogins = 0
+    "test" {
+        Write-Host "Testing system metric collection..." -ForegroundColor Yellow
+        
+        Write-Host "`nSystem Metrics:" -ForegroundColor Cyan
+        $system = Get-SystemMetrics
+        $system | ConvertTo-Json -Depth 3 | Write-Host
+        
+        Write-Host "`nNetwork Metrics:" -ForegroundColor Cyan
+        $network = Get-NetworkMetrics
+        $network | ConvertTo-Json -Depth 3 | Write-Host
+        
+        Write-Host "`nProcess Metrics:" -ForegroundColor Cyan
+        $processes = Get-ProcessMetrics
+        $processes | ConvertTo-Json -Depth 3 | Write-Host
+        
+        Write-Host "`nDevelopment Metrics:" -ForegroundColor Cyan
+        $dev = Get-DevelopmentMetrics
+        $dev | ConvertTo-Json -Depth 3 | Write-Host
     }
-    
-    return $results
-}
-
-
-# Git repository analysis
-function Get-GitInfo {
-    if (Test-Path .git) {
-        try {
-            $branch = git rev-parse --abbrev-ref HEAD 2>$null
-            $commits = git rev-list --count HEAD 2>$null
-            $lastCommit = git log -1 --format="%cr" 2>$null
-            $status = git status --porcelain 2>$null
-            if ($status) {
-                $changes = ($status | Measure-Object).Count
-            } else {
-                $changes = 0
-            }
-            
-            return @{
-                Branch = $branch
-                Commits = $commits
-                LastCommit = $lastCommit
-                UncommittedChanges = $changes
-                Status = if($changes -gt 0) { "Modified" } else { "Clean" }
-            }
-        } catch {
-            return @{ Status = "Git Error" }
-        }
-    }
-    return @{ Status = "Not a Git repo" }
-}
-
-function Get-NetworkInfo {
-    $networkInfo = @{
-        ActiveInterfaces = 0
-        Interfaces = @()
-        InternetConnected = $false
-        Status = "OK"
-    }
-    
-    try {
-        # Get active network adapters with more lenient filtering
-        $adapters = Get-NetAdapter -ErrorAction SilentlyContinue | Where-Object {
-            $_.Status -eq "Up" -and 
-            $_.InterfaceDescription -notlike "*Loopback*" -and
-            $_.InterfaceDescription -notlike "*Teredo*" -and
-            $_.Name -notlike "*Loopback*"
-        }
-        
-        if (-not $adapters) {
-            # Fallback: try to get any "Up" adapter
-            $adapters = Get-NetAdapter -ErrorAction SilentlyContinue | Where-Object {$_.Status -eq "Up"}
-        }
-        
-        $networkInfo.ActiveInterfaces = if ($adapters) { $adapters.Count } else { 0 }
-        
-        # Process each adapter
-        if ($adapters) {
-            foreach ($adapter in $adapters | Select-Object -First 3) {
-                $interfaceInfo = @{
-                    Name = $adapter.Name
-                    IP = "N/A"
-                    Speed = "Unknown"
-                    BytesSent = 0
-                    BytesReceived = 0
-                }
-                
-                # Get IP address - try multiple methods
-                try {
-                    $ip = Get-NetIPAddress -InterfaceIndex $adapter.InterfaceIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue | 
-                          Where-Object {$_.PrefixOrigin -ne "WellKnown"} | 
-                          Select-Object -First 1
-                    
-                    if ($ip -and $ip.IPAddress) {
-                        $interfaceInfo.IP = $ip.IPAddress
-                    }
-                } catch {
-                    # Ignore IP retrieval errors for individual adapters
-                }
-                
-                # Get link speed
-                try {
-                    if ($adapter.LinkSpeed -and $adapter.LinkSpeed -gt 0) {
-                        $speedMbps = [math]::Round($adapter.LinkSpeed / 1000000, 0)
-                        $interfaceInfo.Speed = "$speedMbps Mbps"
-                    }
-                } catch {
-                    # Ignore speed errors
-                }
-                
-                # Get statistics
-                try {
-                    $stats = Get-NetAdapterStatistics -Name $adapter.Name -ErrorAction SilentlyContinue
-                    if ($stats) {
-                        $interfaceInfo.BytesSent = [math]::Round($stats.BytesSent / 1MB, 2)
-                        $interfaceInfo.BytesReceived = [math]::Round($stats.BytesReceived / 1MB, 2)
-                    }
-                } catch {
-                    # Ignore stats errors
-                }
-                
-                $networkInfo.Interfaces += $interfaceInfo
-            }
-        }
-        
-        # Test connectivity - try multiple methods
-        $connectivity = $false
-        
-        # Method 3: Try an HTTP request
-        try {
-            $response = Invoke-WebRequest -Uri "https://www.google.com" -UseBasicParsing -TimeoutSec 3 -ErrorAction Stop
-            $connectivity = $response.StatusCode -eq 200
-        } catch {
-            $connectivity = $false
-        }
-
-        
-        # Method 2: If first test fails, try Cloudflare DNS
-        if (-not $connectivity) {
-            try {
-                $connectivity = Test-Connection -ComputerName 1.1.1.1 -Count 1 -Quiet -ErrorAction SilentlyContinue
-            } catch {
-                $connectivity = $false
-            }
-        }
-        
-        $networkInfo.InternetConnected = $connectivity
-        
-        return $networkInfo
-        
-    } catch {
-        # Only return error status if we can't get basic network info
-        Write-Warning "Network function error: $($_.Exception.Message)"
-        return @{ 
-            Status = "Network Error: $($_.Exception.Message)"
-            ActiveInterfaces = 0
-            Interfaces = @()
-            InternetConnected = $false
-        }
+    default {
+        Write-Host "❌ Error: Unknown command '$command'" -ForegroundColor Red
+        Write-Host "Available commands: start, config, test, help" -ForegroundColor Yellow
+        Write-Host "Use 'chater-hud help' for more information" -ForegroundColor Gray
     }
 }
-
-
-# Main HUD display
-function Show-CyberHUD {
-    Clear-Host
-    Show-CyberBanner
-    
-    Write-Host "`n┌─ SYSTEM VITALS " -NoNewline -ForegroundColor Cyan
-    Write-Host ("-" * 61 + "|") -ForegroundColor DarkCyan
-    
-    # CPU Usage
-    $cpu = Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average | Select-Object -ExpandProperty Average
-    $cpuColor = "Green"
-    if ($cpu -gt $AlertThreshold.CPU) {
-        $cpuColor = "Red"
-    } elseif ($cpu -gt 50) {
-        $cpuColor = "Yellow"
-    }
-    Show-ProgressBar -Percentage $cpu -Label "CPU USAGE" -Color $cpuColor
-    
-    # Memory Usage
-    $mem = Get-CimInstance Win32_OperatingSystem
-    $totalMem = [math]::Round($mem.TotalVisibleMemorySize / 1MB, 2)
-    $freeMem = [math]::Round($mem.FreePhysicalMemory / 1MB, 2)
-    $usedMem = [math]::Round($totalMem - $freeMem, 2)
-    $memPercent = [math]::Round(($usedMem / $totalMem) * 100, 1)
-    $memColor = "Green"
-    if ($memPercent -gt $AlertThreshold.Memory) {
-        $memColor = "Red"
-    } elseif ($memPercent -gt 60) {
-        $memColor = "Yellow"
-    }
-    Show-ProgressBar -Percentage $memPercent -Label "MEMORY ($usedMem/$totalMem GB)" -Color $memColor
-    
-    # Disk Usage
-    $disk = Get-PSDrive C
-    $totalDisk = [math]::Round(($disk.Used + $disk.Free) / 1GB, 2)
-    $usedDisk = [math]::Round($disk.Used / 1GB, 2)
-    $diskPercent = [math]::Round(($usedDisk / $totalDisk) * 100, 1)
-    $diskColor = "Cyan"
-    if ($diskPercent -gt $AlertThreshold.Disk) {
-        $diskColor = "Red"
-    } elseif ($diskPercent -gt 75) {
-        $diskColor = "Yellow"
-    }
-    Show-ProgressBar -Percentage $diskPercent -Label "DISK C: ($usedDisk/$totalDisk GB)" -Color $diskColor
-    
-    # Temperature (if available)
-    $temp = Get-SystemTemperature
-    if ($temp) {
-        $tempColor = "Green"
-        if ($temp -gt $AlertThreshold.Temperature) {
-            $tempColor = "Red"
-        } elseif ($temp -gt 50) {
-            $tempColor = "Yellow"
-        }
-        Show-ProgressBar -Percentage ($temp * 1.25) -Label "TEMP ($temp°C)" -Color $tempColor -Width 30
-    }
-    
-    Write-Host "`n|- NETWORK STATUS " -NoNewline -ForegroundColor Cyan
-    Write-Host ("-" * 60 + "|") -ForegroundColor DarkCyan
-    
-    $netInfo = Get-NetworkInfo
-    if ($netInfo.Status) {
-        $connectionStatus = "❌"
-        $connectionColor = "Red"
-        if ($netInfo.InternetConnected) {
-            $connectionStatus = "🌐"
-            $connectionColor = "Green"
-        }
-        
-        Write-Host "  Internet: " -NoNewline
-        Write-Host $connectionStatus -ForegroundColor $connectionColor
-        
-        Write-Host "   Active Interfaces: $($netInfo.ActiveInterfaces)" -ForegroundColor Cyan
-        
-        foreach ($interface in $netInfo.Interfaces | Select-Object -First 2) {
-            Write-Host "    └- $($interface.Name): $($interface.IP) [$($interface.Speed)]" -ForegroundColor Gray
-        }
-    } else {
-        Write-Host " ⚠️   $($netInfo.Status)" -ForegroundColor Red
-        
-    }
-    
-    Write-Host "`n|- SECURITY STATUS " -NoNewline -ForegroundColor Cyan
-    Write-Host ("-" * 59 + "|") -ForegroundColor DarkCyan
-    
-    $security = Get-SecurityStatus
-    
-    $avIcon = if($security.AntivirusEnabled -eq $true) {"🛡️"} else {"⚠️"}
-    $avColor = if($security.AntivirusEnabled -eq $true) {"Green"} else {"Red"}
-    Write-Host "  $avIcon Antivirus: " -NoNewline
-    Write-Host $security.AntivirusEnabled -ForegroundColor $avColor
-
-    $fwIcon = if($security.FirewallEnabled -eq $true) {"🛡️"} else {"❌"}
-    $fwColor = if($security.FirewallEnabled -eq $true) {"Green"} else {"Red"}
-    Write-Host "  $fwIcon Firewall: " -NoNewline
-    Write-Host $security.FirewallEnabled -ForegroundColor $fwColor
-    
-    $failColor = "Green"
-    if ($security.FailedLogins -gt 5) {
-        $failColor = "Red"
-    } elseif ($security.FailedLogins -gt 0) {
-        $failColor = "Yellow"
-    }
-    Write-Host "  Failed Logins (24h): " -NoNewline
-    Write-Host $security.FailedLogins -ForegroundColor $failColor
-    
-    Write-Host "`n|- DEVELOPMENT STATUS " -NoNewline -ForegroundColor Cyan
-    Write-Host ("-" * 56 + "|") -ForegroundColor DarkCyan
-    
-    # Git Information
-    $git = Get-GitInfo
-    if ($git.Status -eq "Not a Git repo" -or $git.Status -eq "Git Error") {
-        Write-Host "  🌿 $($git.Status)" -ForegroundColor DarkGray
-    } else {
-        $statusColor = "Green"
-        if ($git.Status -ne "Clean") {
-            $statusColor = "Yellow"
-        }
-        $statusIcon = if($git.Status -eq "Clean") {"✅"} else {"⚡"}
-
-        Write-Host " 🌿 [GIT] Branch: $($git.Branch) | Status: " -NoNewline -ForegroundColor Blue
-        Write-Host "$statusIcon $($git.Status)" -ForegroundColor $statusColor
-        Write-Host "       |- Commits: $($git.Commits) | Last: $($git.LastCommit)" -ForegroundColor Gray
-        if ($git.UncommittedChanges -gt 0) {
-            Write-Host "       |- Uncommitted changes: $($git.UncommittedChanges)" -ForegroundColor Yellow
-        }
-    }
-    
-    # Docker Status
-    Write-Host "  🐳 Docker: " -NoNewline
-    try {
-        $dockerOutput = docker ps -q 2>$null
-        if ($LASTEXITCODE -eq 0 -and $dockerOutput) {
-            $dockerCount = ($dockerOutput | Measure-Object).Count
-            Write-Host "$dockerCount container(s) running" -ForegroundColor Green
-        } elseif ($LASTEXITCODE -eq 0) {
-            Write-Host "Running, no containers" -ForegroundColor Yellow
-        } else {
-            Write-Host "Not running" -ForegroundColor Red
-        }
-    } catch {
-        Write-Host "Not installed" -ForegroundColor DarkGray
-    }
-    
-    Write-Host "`n|- TOP PROCESSES " -NoNewline -ForegroundColor Cyan
-    Write-Host ("-" * 61 + "|") -ForegroundColor DarkCyan
-    
-    $processes = Get-TopProcesses
-    foreach ($proc in $processes) {
-        if ($proc.CPU) {
-            $cpu = [math]::Round($proc.CPU, 1)
-        } else {
-            $cpu = 0
-        }
-        $memory = [math]::Round($proc.WorkingSet / 1MB, 1)
-        Write-Host " ⚙️  $($proc.Name.PadRight(20)) CPU: $($cpu.ToString().PadLeft(6))% | RAM: $($memory.ToString().PadLeft(6))MB" -ForegroundColor Gray
-    }
-    
-    # System uptime
-    $uptime = (Get-CimInstance Win32_OperatingSystem).LastBootUpTime
-    $uptimeSpan = (Get-Date) - $uptime
-    $uptimeStr = "{0:dd}d {0:hh}h {0:mm}m" -f $uptimeSpan
-    
-    Write-Host "`n|- SYSTEM INFO " -NoNewline -ForegroundColor Cyan
-    Write-Host ("-" * 63 + "|") -ForegroundColor DarkCyan
-    Write-Host " ⏱️    Uptime: $uptimeStr" -ForegroundColor Magenta
-    Write-Host " 💻    Host: $env:COMPUTERNAME" -ForegroundColor Blue
-    Write-Host " 👤    User: $env:USERNAME" -ForegroundColor Blue
-
-    $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-    Write-Host "`n|=============================================================================|" -ForegroundColor DarkCyan
-    Write-Host "| SCAN COMPLETE | $timestamp | Refresh: ${RefreshRate}s | Ctrl+C to exit    |" -ForegroundColor DarkCyan
-    Write-Host "|=============================================================================|" -ForegroundColor DarkCyan
-}
-
-# Logging function
-function Write-SystemLog {
-    param([string]$Message, [string]$Level = "INFO")
-    $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-    $logEntry = "[$timestamp] [$Level] $Message"
-    Add-Content -Path $LogFile -Value $logEntry
-}
-
-# Alert system
-function CheckSystemAlerts {
-    $cpu = Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average | Select-Object -ExpandProperty Average
-    
-    if ($cpu -gt $AlertThreshold.CPU) {
-        Write-SystemLog "HIGH CPU USAGE: $cpu%" "ALERT"
-        Write-Host "`n ALERT: High CPU usage detected ($cpu%)" -ForegroundColor Red -BackgroundColor Black
-    }
-    
-    # Add more alert conditions as needed
-}
-
-# Main execution
-Write-Host "Initializing CYBER SYSTEM MONITOR..." -ForegroundColor Green
-Write-SystemLog "System monitor started"
-
-try {
-    while ($true) {
-        Show-CyberHUD
-        CheckSystemAlerts
-        Start-Sleep -Seconds $RefreshRate
-    }
-} catch [System.OperationCanceledException] {
-    Write-Host "`n🛑 MONITOR TERMINATED BY USER" -ForegroundColor Yellow
-    Write-SystemLog "Monitor stopped by user"
-} catch {
-    Write-Host "`n💥 CRITICAL ERROR: $($_.Exception.Message)" -ForegroundColor Red
-    Write-SystemLog "Error: $($_.Exception.Message)" "ERROR"
-} finally {
-    Write-Host "Shutting down systems..." -ForegroundColor Gray
-    Write-SystemLog "Monitor shutdown"
-}
+#endregion

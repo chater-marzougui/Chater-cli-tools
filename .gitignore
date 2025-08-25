@@ -1,6 +1,7 @@
 .env
 
 cmd-wrappers/
+logs/
 helpers/*.json
 helpers/*.txt
 helpers/.secrets
