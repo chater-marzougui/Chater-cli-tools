@@ -5,9 +5,9 @@
 # Pass all arguments to the original command
 if ($args.Count -gt 0) {
     $argumentString = $args -join ' '
-    $fullCommand = "chater-ip $argumentString"
+    $fullCommand = "chater-net ip $argumentString"
 } else {
-    $fullCommand = "chater-ip"
+    $fullCommand = "chater-net ip"
 }
 
 Invoke-Expression $fullCommand
