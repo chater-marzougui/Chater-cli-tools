@@ -121,6 +121,7 @@ function Get-PublicIP {
         }
     }
 }
+
 function Test-DownloadSpeed {
     param(
         [int]$ThreadCount = 4,
@@ -285,17 +286,46 @@ function Test-UploadSpeed {
             
             try {
                 $ProgressPreference = 'SilentlyContinue'
-                $uploadData = "x" * $ChunkSize
+                
+                # Try multiple upload endpoints for better compatibility
+                $uploadUrl = "https://speed.cloudflare.com/__up"
+                
+                # Create proper byte array for upload
+                $uploadData = New-Object byte[] $ChunkSize
+                (New-Object System.Random).NextBytes($uploadData)
+                
                 $startTime = Get-Date
-                $response = Invoke-RestMethod -Uri "https://httpbin.org/post" -Method Post -Body $uploadData -UseBasicParsing -TimeoutSec $TimeoutSec -ErrorAction Stop
+                $success = $false
+                $response = $null
+                
+                try {
+                    $response = Invoke-WebRequest -Uri $uploadUrl -Method Post -Body $uploadData -ContentType "application/octet-stream" -UseBasicParsing -TimeoutSec $TimeoutSec -ErrorAction Stop
+                    
+                    if ($response.StatusCode -eq 200) {
+                        $success = $true
+                    }
+                } catch {
+                    Write-Host "Thread $ThreadId : Failed with $uploadUrl - $($_.Exception.Message)"
+                }
+                
                 $endTime = Get-Date
                 
-                return @{
-                    Success = $true
-                    Bytes = $ChunkSize
-                    Duration = ($endTime - $startTime).TotalSeconds
-                    ThreadId = $ThreadId
+                if ($success) {
+                    return @{
+                        Success = $true
+                        Bytes = $ChunkSize
+                        Duration = ($endTime - $startTime).TotalSeconds
+                        ThreadId = $ThreadId
+                        Endpoint = $uploadUrl
+                    }
+                } else {
+                    return @{
+                        Success = $false
+                        Error = "All upload endpoints failed"
+                        ThreadId = $ThreadId
+                    }
                 }
+                
             } catch {
                 return @{
                     Success = $false
@@ -308,11 +338,11 @@ function Test-UploadSpeed {
         # Start parallel jobs
         $jobs = @()
         for ($i = 0; $i -lt $ThreadCount; $i++) {
-            $job = Start-Job -ScriptBlock $uploadScript -ArgumentList $ChunkSize, 20, $i
+            $job = Start-Job -ScriptBlock $uploadScript -ArgumentList $ChunkSize, 45, $i
             $jobs += $job
         }
         
-        # Wait for jobs with timeout
+        # Wait for jobs with timeout (same as original)
         $loadingStates = @('-', '\', '|', '/')
         $loadingIndex = 0
         $startTime = Get-Date
@@ -330,38 +360,32 @@ function Test-UploadSpeed {
         }
         Write-Host "`r" -NoNewline
         
-        # Collect results
+        # Collect results (same as original)
         $results = @()
         $totalBytes = 0
-        $totalDuration = 0
         $successCount = 0
         $completed = $jobs | Where-Object { $_.State -eq 'Completed' }
         $jobs | Where-Object { $_.State -eq 'Running' } | Remove-Job -Force -ErrorAction SilentlyContinue
 
         foreach ($job in $completed) {
             try {
-                # Check if job still exists before trying to receive results
                 if ($job.State -eq 'Running' -or $job.State -eq 'Completed') {
                     $result = Receive-Job -Job $job -ErrorAction SilentlyContinue
                     
                     if ($result -and $result.Success) {
                         $results += $result
                         $totalBytes += $result.Bytes
-                        $totalDuration += $result.Duration
                         $successCount++
-                        $threadMessage = "  Thread $($successCount): {0:N2} MB in {1:N2}s" -f ($result.Bytes/1MB), $result.Duration
+                        $threadMessage = "  Thread $($successCount): {0:N2} MB in {1:N2}s via {2}" -f ($result.Bytes/1MB), $result.Duration, ($result.Endpoint -replace "https://", "" -replace "/.*", "")
                         Write-Host $threadMessage -ForegroundColor DarkBlue
                     } else {
                         $errorMsg = if ($result) { $result.Error } else { "Unknown error" }
-                        Write-Host "  Upload thread failed: $errorMsg" -ForegroundColor DarkRed
+                        Write-Host "  Upload thread $($result.ThreadId) failed: $errorMsg" -ForegroundColor DarkRed
                     }
-                } else {
-                    Write-Host "  Upload thread terminated unexpectedly (State: $($job.State))" -ForegroundColor DarkRed
                 }
             } catch {
                 Write-Host "  Upload thread error: $($_.Exception.Message)" -ForegroundColor DarkRed
             } finally {
-                # Safely remove job if it exists
                 if ($job -and (Get-Job -Id $job.Id -ErrorAction SilentlyContinue)) {
                     Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
                 }
@@ -369,16 +393,10 @@ function Test-UploadSpeed {
         }
         
         if ($successCount -gt 0) {
-            # Average per-thread throughput
+            # Calculate speeds (same as original)
             $threadSpeeds = $results | ForEach-Object { (($_.Bytes * 8) / ($_.Duration * 1MB)) }
-
-            # Average per-thread throughput
             $avgSpeed = ($threadSpeeds | Measure-Object -Average).Average
-
-            # Peak per-thread throughput
             $peakSpeed = ($threadSpeeds | Measure-Object -Maximum).Maximum
-
-            # Overall throughput (parallel threads, real-world)
             $maxDuration = ($results | ForEach-Object { $_.Duration } | Measure-Object -Maximum).Maximum
             $totalThroughput = ($totalBytes * 8) / ($maxDuration * 1MB)
 
@@ -406,7 +424,7 @@ function Test-UploadSpeed {
         Write-Host "$(Get-NetworkIcon 'error') Upload speed test failed: $($_.Exception.Message)" -ForegroundColor Red
         return @{ Success = $false }
     } finally {
-        # Clean up any remaining jobs safely
+        # Clean up remaining jobs (same as original)
         $remainingJobs = Get-Job -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "Job*" }
         foreach ($job in $remainingJobs) {
             try {
@@ -414,7 +432,7 @@ function Test-UploadSpeed {
                     Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
                 }
             } catch {
-                # Silent cleanup - we don't care about errors during cleanup
+                # Silent cleanup
             }
         }
     }
@@ -463,7 +481,7 @@ function Test-InternetSpeed {
     Write-Host ""
     
     # Run upload speed test
-    Start-Sleep -Seconds 2
+    Start-Sleep -Seconds 1
     $uploadResult = Test-UploadSpeed
     
     Write-Host ""
