@@ -45,7 +45,7 @@ function Test-PortOpen {
     param(
         [string]$HostLink = "localhost",
         [int]$Port,
-        [int]$Timeout = 1000
+        [int]$Timeout = 80
     )
     
     try {
@@ -79,11 +79,37 @@ function Get-ProcessByPort {
                     $process = Get-Process -Id $processId -ErrorAction SilentlyContinue
 
                     if ($process) {
+                        # Safely get Path - many system processes will throw access denied
+                        $processPath = "N/A"
+                        try {
+                            if ($process.Path) {
+                                $processPath = $process.Path
+                            }
+                        } catch [System.ComponentModel.Win32Exception] {
+                            # Access denied - common for system processes
+                            $processPath = "Access Denied"
+                        } catch {
+                            $processPath = "N/A"
+                        }
+                        
+                        # Safely get StartTime
+                        $startTime = "N/A"
+                        try {
+                            if ($process.StartTime) {
+                                $startTime = $process.StartTime
+                            }
+                        } catch [System.ComponentModel.Win32Exception] {
+                            # Access denied - common for system processes  
+                            $startTime = "Access Denied"
+                        } catch {
+                            $startTime = "N/A"
+                        }
+
                         return @{
                             PID = $processId
                             ProcessName = $process.ProcessName
-                            Path = try { $process.Path } catch { "N/A" };
-                            StartTime = try { $process.StartTime } catch { "N/A" }
+                            Path = $processPath
+                            StartTime = $startTime
                         }
                     }
                 }
@@ -95,6 +121,47 @@ function Get-ProcessByPort {
     }
 }
 
+function Format-PortRanges {
+    param(
+        [int[]]$Ports
+    )
+    
+    if ($Ports.Count -eq 0) {
+        return ""
+    }
+    
+    # Sort ports to ensure they're in order
+    $ranges = @()
+    $rangeStart = $Ports[0]
+    $rangeEnd = $Ports[0]
+
+    for ($i = 1; $i -lt $Ports.Count; $i++) {
+        if ($Ports[$i] -eq ($rangeEnd + 1)) {
+            # Consecutive port, extend the range
+            $rangeEnd = $Ports[$i]
+        } else {
+            # Gap found, close current range and start new one
+            if ($rangeStart -eq $rangeEnd) {
+                $ranges += $rangeStart.ToString()
+            } else {
+                $ranges += "$rangeStart...$rangeEnd"
+            }
+            $rangeStart = $Ports[$i]
+            $rangeEnd = $Ports[$i]
+        }
+    }
+    
+    # Add the final range
+    if ($rangeStart -eq $rangeEnd) {
+        $ranges += $rangeStart.ToString()
+    } else {
+        $ranges += "$rangeStart...$rangeEnd"
+    }
+    
+    return $ranges -join ', '
+}
+
+
 function Scan_PortRange {
     param(
         [int]$StartPort,
@@ -104,18 +171,20 @@ function Scan_PortRange {
     Write-Host ""
     Write-Host "🔍 Scanning ports $StartPort-$EndPort..." -ForegroundColor Cyan
     Write-Host ""
-    
     $openPorts = @()
+    $availablePorts = @()
     $totalPorts = $EndPort - $StartPort + 1
     $scanned = 0
-    
+
     for ($port = $StartPort; $port -le $EndPort; $port++) {
-        $scanned++
-        $progress = [math]::Round(($scanned / $totalPorts) * 100, 1)
-        
-        # Show progress for larger ranges
-        if ($totalPorts -gt 10) {
-            Write-Progress -Activity "Scanning Ports" -Status "$progress% Complete" -PercentComplete $progress
+        if ($totalPorts -gt 4) {
+            $scanned++
+            $progress = [math]::Round(($scanned / $totalPorts) * 100, 1)
+            $filled = [math]::Round($progress / 2)
+            $empty = 50 - $filled
+            $bar = "█" * $filled + "░" * $empty
+
+            Write-Host "`r[$bar] $progress% Complete" -NoNewline -ForegroundColor Green
         }
         
         if (Test-PortOpen -Port $port) {
@@ -124,11 +193,15 @@ function Scan_PortRange {
                 Port = $port
                 Process = $processInfo
             }
+        } else {
+            $availablePorts += $port
         }
     }
-    
-    if ($totalPorts -gt 10) {
-        Write-Progress -Activity "Scanning Ports" -Completed
+
+    # Add a newline after the progress bar is complete
+    if ($totalPorts -gt 4) {
+        Write-Host "`r" + (" " * 70) -NoNewline
+        Write-Host "`r" -NoNewline
     }
     
     if ($openPorts.Count -eq 0) {
@@ -146,10 +219,10 @@ function Scan_PortRange {
             
             if ($process) {
                 Write-Host "   Process: $($process.ProcessName) (PID: $($process.PID))" -ForegroundColor White
-                if ($process.Path -ne "N/A") {
+                if (-not [string]::IsNullOrEmpty($process.Path) -and $process.Path -ne "N/A") {
                     Write-Host "   Path: $($process.Path)" -ForegroundColor Gray
                 }
-                if ($process.StartTime -ne "N/A") {
+                if (-not [string]::IsNullOrEmpty($process.StartTime) -and $process.StartTime -ne "N/A") {
                     $runtime = (Get-Date) - $process.StartTime
                     Write-Host "   Running: $($runtime.Hours)h $($runtime.Minutes)m" -ForegroundColor Gray
                 }
@@ -157,10 +230,16 @@ function Scan_PortRange {
                 Write-Host "   Process: Unable to identify" -ForegroundColor Gray
             }
         }
+        Write-Host ""
+        if ($availablePorts.Count -gt 1) {
+            $formattedPorts = Format-PortRanges -Ports $availablePorts
+            Write-Host "✅ Ports $formattedPorts are available" -ForegroundColor Green
+        } elseif ($availablePorts.Count -eq 1) {
+            Write-Host "✅ Port $availablePorts is available" -ForegroundColor Green
+        }
     }
     Write-Host ""
 }
-
 function Show-PortProcess {
     param([int]$Port)
     
@@ -183,13 +262,27 @@ function Show-PortProcess {
         Write-Host "Process Name: $($process.ProcessName)" -ForegroundColor White
         Write-Host "PID: $($process.PID)" -ForegroundColor White
         
-        if ($process.Path -ne "N/A") {
+        if ($process.Path -ne "N/A" -and -not [string]::IsNullOrWhiteSpace($process.Path)) {
             Write-Host "Path: $($process.Path)" -ForegroundColor Gray
         }
         
-        if ($process.StartTime -ne "N/A") {
-            $runtime = (Get-Date) - $process.StartTime
-            Write-Host "Running Time: $($runtime.Hours)h $($runtime.Minutes)m" -ForegroundColor Gray
+        # Fix: Check if StartTime is a valid DateTime object before calculating runtime
+        if ($process.StartTime -ne "N/A" -and $process.StartTime -is [DateTime]) {
+            try {
+                $runtime = (Get-Date) - $process.StartTime
+                Write-Host "Running Time: $($runtime.Days)d $($runtime.Hours)h $($runtime.Minutes)m" -ForegroundColor Gray
+            } catch {
+                Write-Host "Start Time: $($process.StartTime)" -ForegroundColor Gray
+            }
+        } elseif ($process.StartTime -ne "N/A") {
+            # If StartTime exists but isn't a DateTime, try to parse it
+            try {
+                $startTime = [DateTime]::Parse($process.StartTime)
+                $runtime = (Get-Date) - $startTime
+                Write-Host "Running Time: $($runtime.Days)d $($runtime.Hours)h $($runtime.Minutes)m" -ForegroundColor Gray
+            } catch {
+                Write-Host "Start Time: $($process.StartTime)" -ForegroundColor Gray
+            }
         }
         
         Write-Host ""
