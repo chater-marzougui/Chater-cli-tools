@@ -2,6 +2,7 @@
 
 cmd-wrappers/
 logs/
+videos/
 helpers/*.json
 helpers/*.txt
 helpers/.secrets
