@@ -1,4 +1,4 @@
-
+﻿
 #endregion
 
 #region Data Collection Functions
