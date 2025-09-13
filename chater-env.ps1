@@ -57,6 +57,34 @@ function Create_Env {
     Write-Host "Location: $envFile" -ForegroundColor Gray
 }
 
+function Create-EnvExample {
+    $envFile = Get-EnvFilePath
+    if (-not (Test-Path $envFile)) {
+        Write-Host "❌ Error: No .env file found in current directory" -ForegroundColor Red
+        return
+    }
+
+    $exampleFile = Join-Path (Get-Location) ".env.example"
+    $envVars = Read-EnvFile
+
+    $lines = @()
+    $lines += "# Example environment file"
+    $lines += "# Generated from .env on $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+    $lines += ""
+
+    foreach ($key in ($envVars.Keys | Sort-Object)) {
+        # Convert API_KEY -> "api key"
+        $friendly = $key.ToLower() -replace "_", " "
+        $placeholder = "your $friendly"
+
+        $lines += "$key=`"$placeholder`""
+    }
+
+    $lines | Out-File -FilePath $exampleFile -Encoding UTF8
+    Write-Host "✅ Created .env.example file" -ForegroundColor Green
+    Write-Host "Location: $exampleFile" -ForegroundColor Gray
+}
+
 function Read-EnvFile {
     $envFile = Get-EnvFilePath
     $envVars = @{}
@@ -362,8 +390,18 @@ try {
         }
 
         "create" {
-            Create_Env
+            if ($Arguments.Count -eq 1) {
+                Create_Env
+            }
+            elseif ($Arguments.Count -ge 2 -and ($Arguments[1] -in @("example","-e","--e"))) {
+                Create-EnvExample
+            }
+            else {
+                Write-Host "❌ Error: Unknown option for create: $($Arguments[1])" -ForegroundColor Red
+                Write-Host "Usage: chater-env create [example|-e|--e]" -ForegroundColor Yellow
+            }
         }
+
             
         default {
             Write-Host "❌ Error: Unknown command '$command'" -ForegroundColor Red
