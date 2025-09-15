@@ -3,7 +3,7 @@
     [string[]]$Arguments
 )
 
-$location = Split-Path -Parent $MyInvocation.MyCommand.Path
+$location = Get-Location
 
 
 $envFilePath = Join-Path $PSScriptRoot ".env"
