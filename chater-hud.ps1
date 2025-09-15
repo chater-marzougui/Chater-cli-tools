@@ -3,6 +3,8 @@
     [string[]]$Arguments
 )
 
+$location = Split-Path -Parent $MyInvocation.MyCommand.Path
+
 
 $envFilePath = Join-Path $PSScriptRoot ".env"
 $scriptDir = (Get-Content $envFilePath | Where-Object { $_ -match "^MAIN_SCRIPTS_PATH=" }) -replace "MAIN_SCRIPTS_PATH=", ""
@@ -418,7 +420,7 @@ function Start-SystemMonitor {
                 $systemMetrics = Get-SystemMetrics
                 $networkMetrics = Get-NetworkMetrics
                 $processMetrics = Get-ProcessMetrics
-                $devMetrics = Get-DevelopmentMetrics
+                $devMetrics = Get-DevelopmentMetrics -InvokedLocation $using:location
 
                 # Return all results as a single object
                 [PSCustomObject]@{
@@ -550,7 +552,7 @@ switch ($command) {
         $processes | ConvertTo-Json -Depth 3 | Write-Host
         
         Write-Host "`nDevelopment Metrics:" -ForegroundColor Cyan
-        $dev = Get-DevelopmentMetrics
+        $dev = Get-DevelopmentMetrics -InvokedLocation $location
         $dev | ConvertTo-Json -Depth 3 | Write-Host
     }
     default {

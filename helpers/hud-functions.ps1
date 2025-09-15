@@ -1,7 +1,4 @@
-﻿
-#endregion
-
-#region Data Collection Functions
+﻿#region Data Collection Functions
 function Get-SystemMetrics {
     $metrics = @{}
     
@@ -73,6 +70,17 @@ function Get-SystemMetrics {
     return $metrics
 }
 
+function Test-InternetConnection {
+    try {
+        $result = Test-NetConnection -ComputerName "8.8.8.8" -Port 53 -InformationLevel Quiet -WarningAction SilentlyContinue
+        Write-Host "Internet connectivity test result: $result" -ForegroundColor Green
+        return $result
+    }
+    catch {
+        return $false
+    }
+}
+
 function Get-NetworkMetrics {
     $network = @{
         Interfaces = @()
@@ -80,13 +88,14 @@ function Get-NetworkMetrics {
     }
     
     try {
-       $adapters = Get-NetAdapter -ErrorAction SilentlyContinue |
-               Where-Object {
-                   $_.Name -notlike "Loopback*" -and
-                   $_.Name -notlike "*Hyper-V*" -and
-                   $_.Name -notlike "*Local Area Connection*"
-               } |
-               Sort-Object InterfaceMetric
+        $adapters = Get-NetAdapter -ErrorAction SilentlyContinue |
+                Where-Object {
+                    $_.Name -notlike "Loopback*" -and
+                    $_.Name -notlike "*Hyper-V*" -and
+                    $_.Name -notlike "*Local Area Connection*"
+                } |
+                Sort-Object InterfaceMetric
+                
         foreach ($adapter in $adapters | Select-Object -First 5) {
             $interfaceInfo = @{
                 Name = $adapter.Name
@@ -114,21 +123,35 @@ function Get-NetworkMetrics {
             $network.Interfaces += $interfaceInfo
         }
         
-        # Test internet connectivity
-       try {
-            $client = [System.Net.Http.HttpClient]::new()
-            # Send a lightweight HEAD request (faster than GET)
-            $request = New-Object System.Net.Http.HttpRequestMessage 'HEAD', 'https://www.google.com'
-            $response = $client.SendAsync($request).Result
-            if ($response.IsSuccessStatusCode) {
-                $network.InternetConnected = $true
+        # Test internet connectivity - MULTIPLE ENDPOINT VERSION (most reliable)
+        try {
+            $endpoints = @("8.8.8.8", "1.1.1.1", "208.67.222.222")
+            $successCount = 0
+            
+            foreach ($endpoint in $endpoints) {
+                try {
+                    if (Test-Connection -ComputerName $endpoint -Count 1 -Quiet -ErrorAction Stop) {
+                        $successCount++
+                        break  # Exit on first success for speed
+                    }
+                }
+                catch {
+                    # Continue to next endpoint
+                }
             }
-
-            $client.Dispose()
+            
+            $network.InternetConnected = ($successCount -gt 0)
         }
         catch {
-            $network.InternetConnected = $false
+            # Fallback to your existing function
+            try {
+                $network.InternetConnected = Test-InternetConnection
+            }
+            catch {
+                $network.InternetConnected = $false
+            }
         }
+        
     } catch {
         Write-Log "Error collecting network metrics: $($_.Exception.Message)" 'ERROR'
     }
@@ -182,6 +205,10 @@ function Get-ProcessMetrics {
 }
 
 function Get-DevelopmentMetrics {
+    param (
+        [string]$InvokedLocation = (Get-Location).Path
+    )
+    
     $dev = @{
         Git = @{ Status = "Not a Git repository" }
         Docker = @{ Status = "Not installed" }
@@ -191,8 +218,11 @@ function Get-DevelopmentMetrics {
     
     try {
         # Git information
-        if (Test-Path .git) {
-            try {
+        Push-Location $InvokedLocation
+        try {
+            # Method 1: Check if we're in a git repository at all
+            $gitCheck = git rev-parse --git-dir 2>$null
+            if ($LASTEXITCODE -eq 0) {
                 $branch = git rev-parse --abbrev-ref HEAD 2>$null
                 $status = git status --porcelain 2>$null
                 $changes = if($status) { ($status | Measure-Object).Count } else { 0 }
@@ -203,10 +233,13 @@ function Get-DevelopmentMetrics {
                     Branch = $branch
                     Changes = $changes
                     LastCommit = $lastCommit
+                    Directory = $Script:InvocationDirectory.Path
                 }
-            } catch {
-                $dev.Git.Status = "Git error"
             }
+        } catch {
+            $dev.Git.Status = "Git error"
+        } finally {
+            Pop-Location
         }
         
         # Docker status
