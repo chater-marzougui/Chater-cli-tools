@@ -90,7 +90,6 @@ function Set-Version {
         commit = $Commit
         date = $Date
         user_customized = $true
-        last_update = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
     }
     
     $versionPath = Join-Path $scriptDir $VERSION_FILE
@@ -573,9 +572,6 @@ switch ($Command.ToLower()) {
         Write-Host "Commit:       $($current.commit)" -ForegroundColor White
         Write-Host "Date:         $($current.date)" -ForegroundColor White
         Write-Host "Customized:   $($current.user_customized)" -ForegroundColor White
-        if ($current.last_update) {
-            Write-Host "Last Update:  $($current.last_update)" -ForegroundColor White
-        }
     }
     
     default {
