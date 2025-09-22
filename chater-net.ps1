@@ -12,7 +12,7 @@ function Show-Help {
         [bool]$isSmall = $false
     )
     Write-Host ""
-    Write-Host "Chater-Net - Network Diagnostics Suite" -ForegroundColor Cyan
+    Write-Host "chater-Net - Network Diagnostics Suite" -ForegroundColor Cyan
     Write-Host "=====================================" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "DESCRIPTION:" -ForegroundColor Yellow
