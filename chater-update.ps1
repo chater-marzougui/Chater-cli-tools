@@ -94,7 +94,7 @@ function Set-Version {
     }
     
     $versionPath = Join-Path $scriptDir $VERSION_FILE
-    $versionData | ConvertTo-Json -Depth 2 | Set-Content -Path $versionPath -Encoding UTF8
+    $versionData | ConvertTo-Json -Depth 2 | Set-Content -Path $versionPath -Encoding UTF8 -NoNewline
 }
 
 function Get-LatestVersion {
@@ -403,7 +403,7 @@ function Merge-Updates {
                 $content = $attribution + $content
             }
             
-            Set-Content -Path $newFile.target -Value $content -Encoding UTF8
+            Set-Content -Path $newFile.target -Value $content -Encoding UTF8 -NoNewline
             Write-Host "✅ Added: $($newFile.name)" -ForegroundColor Green
         } catch {
             Write-Host "❌ Failed to add $($newFile.name): $($_.Exception.Message)" -ForegroundColor Red
@@ -435,7 +435,7 @@ function Merge-Updates {
             $backupPath = "$($modFile.target).backup"
             Copy-Item $modFile.target $backupPath -Force
             
-            Set-Content -Path $modFile.target -Value $updatedContent -Encoding UTF8
+            Set-Content -Path $modFile.target -Value $updatedContent -Encoding UTF8 -NoNewline
             Write-Host "✅ Updated: $($modFile.name)" -ForegroundColor Green
         } catch {
             Write-Host "❌ Failed to update $($modFile.name): $($_.Exception.Message)" -ForegroundColor Red
