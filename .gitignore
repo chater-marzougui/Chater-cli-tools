@@ -7,3 +7,4 @@ helpers/*.json
 helpers/*.txt
 helpers/.secrets
 common-commands/
+!helpers/version.json

@@ -273,6 +273,25 @@ function Run_Adapter {
     }
 }
 
+function Initialize-VersionFile {
+    $versionFilePath = Join-Path $scriptDir "helpers\version.json"
+    if (-not (Test-Path $versionFilePath)) {
+        Write-Host "🆕 Creating version.json file..." -ForegroundColor Blue    
+        # Initialize version file
+        $versionData = @{
+            version = "0.1.0"
+            commit = (git rev-parse HEAD 2>$null) -or "unknown"
+            date = (Get-Date).ToString("yyyy-MM-dd")
+            user_customized = $true
+        }
+        $versionPath = Join-Path $scriptDir "helpers/version.json"
+        $versionData | ConvertTo-Json -Depth 2 | Set-Content -Path $versionPath -Encoding UTF8
+        Write-Host ""
+    } else {
+        Write-Host "⚠️  version.json already exists, skipping creation." -ForegroundColor Yellow
+    }
+}
+
 function Main {
     Write-Host ""
     Write-Host "🚀 PowerShell Scripts Setup - Bootstrap Installer" -ForegroundColor Cyan
@@ -345,6 +364,9 @@ function Main {
     Write-Host "⚙️  Step 5: Creating .cmd wrappers..." -ForegroundColor Blue
     Run_Adapter -NewUserName $UserName
     Write-Host ""
+
+    # Step 6: Creating version.json if not exists
+    Initialize-VersionFile
     
     # Final summary
     Write-Host "🎉 Setup Complete!" -ForegroundColor Green
