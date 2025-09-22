@@ -129,42 +129,9 @@ function Get-PublicIP {
     }
 }
 
-function Test-Latency {
-    param(
-        [string]$TargetHost = "1.1.1.1",
-        [int]$Count = 4
-    )
-    
-    try {
-        $ping = Test-Connection -ComputerName $TargetHost -Count $Count -ErrorAction SilentlyContinue
-        if ($ping) {
-            $avgLatency = ($ping | Measure-Object -Property ResponseTime -Average).Average
-            $minLatency = ($ping | Measure-Object -Property ResponseTime -Minimum).Minimum
-            $maxLatency = ($ping | Measure-Object -Property ResponseTime -Maximum).Maximum
-            
-            $latencyMessage = "$(Get-NetworkIcon 'ping') Latency: {0:N0}ms avg | {1:N0}ms min | {2:N0}ms max (to $TargetHost)" -f $avgLatency, $minLatency, $maxLatency
-            Write-Host $latencyMessage -ForegroundColor Yellow
-            
-            return @{
-                Success = $true
-                Average = $avgLatency
-                Minimum = $minLatency
-                Maximum = $maxLatency
-                TargetHost = $TargetHost
-            }
-        } else {
-            Write-Host "$(Get-NetworkIcon 'error') Latency test failed: No response from $TargetHost" -ForegroundColor Red
-            return @{ Success = $false }
-        }
-    } catch {
-        Write-Host "$(Get-NetworkIcon 'error') Latency test failed: $($_.Exception.Message)" -ForegroundColor Red
-        return @{ Success = $false }
-    }
-}
-
 function Test-InternetSpeed {
     Write-SectionHeader "Internet Speed Test" "⚡"
-    Write-Host "Running speed test (this may take a moment)..." -ForegroundColor Gray
+    Write-Host "Running speed test..." -ForegroundColor Gray
     
     # Run download speed test
     $downloadResult = Test-DownloadSpeed
