@@ -1,10 +1,24 @@
+# Ignore environment variables file
 .env
 
+# Ignore Auto-Generated directories
 cmd-wrappers/
 logs/
+
+# Ignore videos directory
 videos/
+
+# Ignore Auto-Generated file
 helpers/*.json
 helpers/*.txt
 helpers/.secrets
+
+# Ignore user-specific folder
 common-commands/
+
+# Ignore any backup file/directory
+backup-*
+*.backup
+
+# Exception: DO include the version.json file in helpers
 !helpers/version.json
