@@ -90,3 +90,5 @@ Write-Host "`n" -NoNewline
 Write-Host ("=" * 60) -ForegroundColor Cyan
 Write-Host "  SCAN COMPLETE" -ForegroundColor Yellow
 Write-Host ("=" * 60) -ForegroundColor Cyan
+
+chater-update check

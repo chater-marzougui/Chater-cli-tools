@@ -118,7 +118,7 @@ function Show-SavedTexts {
     Write-Host ""
 }
 
-function New-QRCode {
+function New-QRCodeWeb {
     param(
         [string]$Text
     )
@@ -133,6 +133,31 @@ function New-QRCode {
     catch {
         Write-Host "❌ Error opening QR code: $($_.Exception.Message)" -ForegroundColor Red
         Write-Host "🔗 Manual link: $qrUrl" -ForegroundColor Yellow
+    }
+}
+
+function New-QRCode {
+    param (
+        [string]$Text
+    )
+
+    # Attempt to use qrencode if available
+    # Install-Module -Name QrCodes -Scope CurrentUser
+    # ConvertTo-QRCode "https://example.com"
+    
+    try {
+        if (Get-Command "ConvertTo-QRCode" -ErrorAction SilentlyContinue) {
+            ConvertTo-QRCode -InputObject $Text | Format-QRCode -TopPadding 1 -SidePadding 2
+        } else {
+            Write-Host "⚠️ 'ConvertTo-QRCode' command not found. Falling back to web-based QR code generation." -ForegroundColor Yellow
+            Write-Host "💡 To enable terminal QR codes, install the 'QrCodes' module via:" -ForegroundColor Gray
+            Write-Host "   Install-Module -Name QrCodes -Scope CurrentUser" -ForegroundColor Gray
+            New-QRCodeWeb -Text $Text
+        }
+    }
+    catch {
+        Write-Host "❌ Error generating QR code: $($_.Exception.Message)" -ForegroundColor Red
+        New-QRCode-Fallback -Text $Text
     }
 }
 
@@ -155,10 +180,12 @@ $listFlag = $false
 $removeFlag = $false
 $nextArgIsAlias = $false
 $nextArgIsRemove = $false
+$useWebVersion = $false
 
 $saveArgs = @("-s", "--s", "-save", "--save")
 $listArgs = @("-l", "--l", "-list", "--list")
 $removeArgs = @("-rm", "--rm", "-remove", "--remove")
+$webArgs = @("--web", '-web', '-w')
 foreach ($arg in $Arguments) {
     if ($nextArgIsAlias) {
         $saveAlias = $arg
@@ -175,6 +202,8 @@ foreach ($arg in $Arguments) {
     } elseif ($saveArgs -contains $arg) {
         $saveFlag = $true
         $nextArgIsAlias = $true
+    } elseif ($webArgs -contains $arg) {
+        $useWebVersion = $true
     } else {
         $textParts += $arg
     }
@@ -224,4 +253,8 @@ if ($saveFlag) {
 }
 
 # Generate QR code
-New-QRCode -Text $inputText
+if ($useWebVersion) {
+    New-QRCodeWeb -Text $inputText
+} else {
+    New-QRCode -Text $inputText
+}

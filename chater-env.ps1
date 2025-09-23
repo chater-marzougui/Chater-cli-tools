@@ -253,7 +253,7 @@ function Get-EnvVariable {
     if ($matchedVars.Count -eq 1) {
         $match = if($matchedVars.GetType() -eq [string]) { $matchedVars } else { $matchedVars[0] }
         Write-Host "$match=$($envVars[$match])" -ForegroundColor Green
-        "$match=$($envVars[$match])" | Set-Clipboard
+        "$($envVars[$match])" | Set-Clipboard
         Write-Host "✅ Copied to clipboard" -ForegroundColor DarkGray
         return
     }
@@ -297,7 +297,7 @@ function Remove-EnvVariable {
         $envVars.Remove($Name)
         Write-EnvFile -EnvVars $envVars
         Write-Host "✅ Deleted variable '$Name'" -ForegroundColor Green
-        "$Name=$currentValue" | Set-Clipboard
+        "$currentValue" | Set-Clipboard
         Write-Host "✅ Copied to clipboard if deleted by mistake" -ForegroundColor DarkGray
         return
     }

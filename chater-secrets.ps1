@@ -223,7 +223,7 @@ function Get-Secret {
 
        if ($decryptedValue) {
            Write-Host "$matchedName=$decryptedValue" -ForegroundColor Green
-           "$matchedName=$decryptedValue" | Set-Clipboard
+           "$decryptedValue" | Set-Clipboard
             Write-Host "✅ Copied to clipboard" -ForegroundColor DarkGray
        }
        return
@@ -261,7 +261,7 @@ function Get-Secret {
            if ($decryptedValue) {
                Write-Host ""
                Write-Host "$selectedName=$decryptedValue" -ForegroundColor Green
-               "$selectedName=$decryptedValue" | Set-Clipboard
+               "$decryptedValue" | Set-Clipboard
                 Write-Host "✅ Copied to clipboard" -ForegroundColor DarkGray
            }
        } else {

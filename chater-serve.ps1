@@ -355,12 +355,13 @@ function Start-Ngrok {
 
             if ($publicUrl) {
                 Write-Host "📱 Generating QR code for: $publicUrl" -ForegroundColor $Colors.Info
-                & chater-qr $publicUrl
+                & chater-qr $publicUrl --web
             }
         } -ArgumentList $QR
 
         
         & $ngrokPath http $Port
+        Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
     }
     catch {
         Write-Host "❌ Failed to start ngrok: $($_.Exception.Message)" -ForegroundColor $Colors.Error
