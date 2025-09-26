@@ -257,7 +257,7 @@ function Start-LocalTunnel {
 
     $tunnelArgs = @("lt", "--port", $Port)
 
-    if ($Subdomain -and $Subdomain -ne "") {
+    if (-not [string]::IsNullOrEmpty($Subdomain)) {
         $tunnelArgs += @("--subdomain", $Subdomain)
     }
     
@@ -271,7 +271,7 @@ function Start-LocalTunnel {
     try {
         if (Test-Path $STDOUTFile) { Remove-Item $STDOUTFile -Force }
         if (Test-Path $STDERRFile) { Remove-Item $STDERRFile -Force }
-        $process = Start-Process "npx" -ArgumentList $tunnelArgs `
+        $process = Start-Process "npx.cmd" -ArgumentList $tunnelArgs `
         -RedirectStandardOutput $STDOUTFile -RedirectStandardError $STDERRFile `
         -NoNewWindow -PassThru
 
