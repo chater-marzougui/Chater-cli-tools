@@ -1,13 +1,18 @@
 ﻿$Arguments = $args
 
-# Default ignored directories and files
+# Default ignored directories and files - more specific patterns
 $DefaultIgnored = @(
-    "node_modules", ".git", ".svn", ".hg", "bin", "obj", "packages",
-    ".vs", ".vscode", "dist", "build", "out", "target", "__pycache__",
-    ".pytest_cache", ".mypy_cache", ".tox", "venv", "*.dll", "*.class",
-    "bower_components", "coverage", ".nyc_output", "logs", "*.log",
-    "tmp", "temp", ".tmp", ".temp", "Thumbs.db", ".DS_Store",
-    "*.pyc", "*.pyo", "*.pyd", "*.so"
+    "node_modules", ".git", ".svn", ".hg", 
+    ".vs", ".vscode", "__pycache__", ".pytest_cache", 
+    ".mypy_cache", ".tox", "venv", "env",
+    "bower_components", "coverage", ".nyc_output", 
+    "Thumbs.db", ".DS_Store", "*.tmp", "*.temp",
+    "*.pyc", "*.pyo", "*.pyd", "*.class"
+)
+
+# Patterns that should only match exact directory names (not paths)
+$ExactDirectoryMatches = @(
+    "bin", "obj", "packages", "dist", "build", "out", "target", "tmp", "temp", "logs"
 )
 
 function Show-Help {
@@ -66,11 +71,20 @@ function Test-IgnoreItem {
         [string]$ItemPath,
         [bool]$IsDirectory,
         [string[]]$IgnorePatterns,
+        [string[]]$ExactDirPatterns,
         [bool]$ShowAll
     )
     
     if ($ShowAll) { return $false }
     
+    # Check against exact directory matches (only exact name matches)
+    if ($IsDirectory) {
+        foreach ($pattern in $ExactDirPatterns) {
+            if ($ItemName -eq $pattern) { return $true }
+        }
+    }
+    
+    # Check against general ignore patterns
     foreach ($pattern in $IgnorePatterns) {
         # Exact match for directories
         if ($IsDirectory -and $ItemName -eq $pattern) { return $true }
@@ -78,8 +92,8 @@ function Test-IgnoreItem {
         # Wildcard pattern matching for files
         if (-not $IsDirectory -and $ItemName -like $pattern) { return $true }
         
-        # Path contains pattern
-        if ($ItemPath -like "*$pattern*") { return $true }
+        # Only check if item name contains pattern (not full path)
+        if ($ItemName -like "*$pattern*") { return $true }
     }
     
     return $false
@@ -95,6 +109,7 @@ function Show-TreeStructure {
         [bool]$DirsOnly,
         [string[]]$Extensions,
         [string[]]$IgnorePatterns,
+        [string[]]$ExactDirPatterns,
         [bool]$ShowAll,
         [bool]$ShowSize,
         [string]$Prefix = "",
@@ -109,7 +124,7 @@ function Show-TreeStructure {
         
         foreach ($item in $items) {
             # Apply ignore filters
-            if (Test-IgnoreItem -ItemName $item.Name -ItemPath $item.FullName -IsDirectory $item.PSIsContainer -IgnorePatterns $IgnorePatterns -ShowAll $ShowAll) {
+            if (Test-IgnoreItem -ItemName $item.Name -ItemPath $item.FullName -IsDirectory $item.PSIsContainer -IgnorePatterns $IgnorePatterns -ExactDirPatterns $ExactDirPatterns -ShowAll $ShowAll) {
                 continue
             }
             
@@ -166,6 +181,9 @@ function Show-TreeStructure {
                     ".gif" { "🖼️" }
                     ".css" { "🎨" }
                     ".html" { "🌐" }
+                    ".dart" { "🎯" }
+                    ".yaml" { "📋" }
+                    ".yml" { "📋" }
                     default { "📄" }
                 }
                 $color = "White"
@@ -183,7 +201,7 @@ function Show-TreeStructure {
             
             # Recurse into directories
             if ($item.PSIsContainer -and ($MaxDepth -eq -1 -or $CurrentDepth + 1 -lt $MaxDepth)) {
-                Show-TreeStructure -RootPath $item.FullName -MaxDepth $MaxDepth -FilesOnly $FilesOnly -DirsOnly $DirsOnly -Extensions $Extensions -IgnorePatterns $IgnorePatterns -ShowAll $ShowAll -ShowSize $ShowSize -Prefix $nextPrefix -CurrentDepth ($CurrentDepth + 1)
+                Show-TreeStructure -RootPath $item.FullName -MaxDepth $MaxDepth -FilesOnly $FilesOnly -DirsOnly $DirsOnly -Extensions $Extensions -IgnorePatterns $IgnorePatterns -ExactDirPatterns $ExactDirPatterns -ShowAll $ShowAll -ShowSize $ShowSize -Prefix $nextPrefix -CurrentDepth ($CurrentDepth + 1)
             }
         }
     }
@@ -193,7 +211,6 @@ function Show-TreeStructure {
 }
 
 # Check for help
-
 $helpArgs = @("-h", "--h", "help", "-Help")
 if ($Arguments | Where-Object { $helpArgs -contains $_ }) {
     $isSmall = ($Arguments -contains "--small")
@@ -264,9 +281,6 @@ if (-not (Test-Path $Path)) {
 $resolvedPath = Resolve-Path $Path
 $pathInfo = Get-Item $resolvedPath
 
-# Combine ignore patterns
-$allIgnorePatterns = $DefaultIgnored + $AdditionalIgnore
-
 # Show header
 Write-Host ""
 Write-Host "🌳 Directory Tree: " -NoNewline
@@ -285,7 +299,7 @@ if (-not $pathInfo.PSIsContainer) {
 }
 
 # Show tree structure
-Show-TreeStructure -RootPath $resolvedPath -MaxDepth $MaxDepth -FilesOnly $FilesOnly -DirsOnly $DirsOnly -Extensions $Extensions -IgnorePatterns $allIgnorePatterns -ShowAll $ShowAll -ShowSize $ShowSize
+Show-TreeStructure -RootPath $resolvedPath -MaxDepth $MaxDepth -FilesOnly $FilesOnly -DirsOnly $DirsOnly -Extensions $Extensions -IgnorePatterns ($DefaultIgnored + $AdditionalIgnore) -ExactDirPatterns $ExactDirectoryMatches -ShowAll $ShowAll -ShowSize $ShowSize
 
 Write-Host ""
 

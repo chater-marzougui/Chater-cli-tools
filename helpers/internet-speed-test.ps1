@@ -1,4 +1,4 @@
-function Test-DownloadSpeed {
+﻿function Test-DownloadSpeed {
     param(
         [int]$ThreadCount = 4,
         [int]$ChunkSize = 8MB,

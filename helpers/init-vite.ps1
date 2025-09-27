@@ -213,7 +213,7 @@ try {
 
 # Step 10: Create sample App.tsx
 Write-Step "Creating sample App.tsx..."
-$appContent = @'
+$appContent = @"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -224,7 +224,7 @@ function App() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Welcome to Your App</CardTitle>
+          <CardTitle>Welcome to $projectName</CardTitle>
           <CardDescription>
             Vite + React + TypeScript + Tailwind + shadcn/ui
           </CardDescription>
@@ -242,7 +242,7 @@ function App() {
 }
 
 export default App
-'@
+"@
 
 try {
     $appContent | Out-File -FilePath "src/App.tsx" -Encoding UTF8
@@ -282,6 +282,7 @@ Write-Host ""
 Write-Host "🎉 Project setup completed successfully!" -ForegroundColor Green
 Write-Host ""
 Write-Host "To start your project:" -ForegroundColor Yellow
+Write-Host "  cd $ProjectName" -ForegroundColor Cyan
 Write-Host "  npm run dev" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Add more shadcn/ui components with:" -ForegroundColor Yellow
