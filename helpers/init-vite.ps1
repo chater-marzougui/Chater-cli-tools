@@ -4,7 +4,8 @@
 
 param(
     [Parameter(Mandatory=$true)]
-    [string]$ProjectName
+    [string]$ProjectName,
+    [bool]$NoShadcn = $false
 )
 
 function Write-Step {
@@ -169,51 +170,52 @@ Update-TsConfig-Raw "tsconfig.json"
 
 Update-TsConfig-Raw "tsconfig.app.json"
 
-# Step 8: Initialize shadcn/ui
-Write-Step "Initializing shadcn/ui..."
-Write-Host ""
+if (-not $NoShadcn) {
+    # Step 8: Initialize shadcn/ui
+    Write-Step "Initializing shadcn/ui..."
+    Write-Host ""
 
-try {
-    npx shadcn@latest init
-    if ($LASTEXITCODE -ne 0) { 
-        Write-Warning "shadcn init may have encountered issues, but continuing..."
-    } else {
-        Write-Success "shadcn/ui initialized successfully"
+    try {
+        npx shadcn@latest init
+        if ($LASTEXITCODE -ne 0) { 
+            Write-Warning "shadcn init may have encountered issues, but continuing..."
+        } else {
+            Write-Success "shadcn/ui initialized successfully"
+        }
+    } catch {
+        Write-Error "Failed to initialize shadcn/ui: $_"
+        exit 1
     }
-} catch {
-    Write-Error "Failed to initialize shadcn/ui: $_"
-    exit 1
-}
 
-# Step 9: Install common shadcn/ui components
-$components = @("button", "card", "input", "label")
+    # Step 9: Install common shadcn/ui components
+    $components = @("button", "card", "input", "label")
 
-try {
-    Write-Host "  Installing components: $($components -join ', ')" -ForegroundColor Cyan
-    npx shadcn@latest add $components --yes
-    
-    if ($LASTEXITCODE -ne 0) {
-        Write-Warning "  Failed to install some components"
+    try {
+        Write-Host "  Installing components: $($components -join ', ')" -ForegroundColor Cyan
+        npx shadcn@latest add $components --yes
         
-        # Fallback: try installing one by one
-        Write-Host "  Trying to install components individually..." -ForegroundColor Yellow
-        foreach ($component in $components) {
-            Write-Host "    Installing $component..." -ForegroundColor Cyan
-            npx shadcn@latest add $component --yes
-            if ($LASTEXITCODE -eq 0) {
-                Write-Host "    ✅ $component installed" -ForegroundColor Green
-            } else {
-                Write-Warning "    Failed to install $component"
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "  Failed to install some components"
+            
+            # Fallback: try installing one by one
+            Write-Host "  Trying to install components individually..." -ForegroundColor Yellow
+            foreach ($component in $components) {
+                Write-Host "    Installing $component..." -ForegroundColor Cyan
+                npx shadcn@latest add $component --yes
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Host "    ✅ $component installed" -ForegroundColor Green
+                } else {
+                    Write-Warning "    Failed to install $component"
+                }
             }
         }
+    } catch {
+        Write-Warning "Failed to install components: $_"
     }
-} catch {
-    Write-Warning "Failed to install components: $_"
-}
 
-# Step 10: Create sample App.tsx
-Write-Step "Creating sample App.tsx..."
-$appContent = @"
+    # Step 10: Create sample App.tsx
+    Write-Step "Creating sample App.tsx..."
+    $appContent = @"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -244,14 +246,13 @@ function App() {
 export default App
 "@
 
-try {
-    $appContent | Out-File -FilePath "src/App.tsx" -Encoding UTF8
-    Write-Success "Sample App.tsx created"
-} catch {
-    Write-Error "Failed to create App.tsx: $_"
+    try {
+        $appContent | Out-File -FilePath "src/App.tsx" -Encoding UTF8
+        Write-Success "Sample App.tsx created"
+    } catch {
+        Write-Error "Failed to create App.tsx: $_"
+    }
 }
-
-
 # Step 11: Create sample index.html
 Write-Step "Creating sample index.html..."
 $appContent = @"

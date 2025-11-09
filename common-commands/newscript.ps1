@@ -5,7 +5,7 @@
 # Pass all arguments to the original command
 if ($args.Count -gt 0) {
     $argumentString = $args -join ' '
-    $fullCommand = "chater-adapt | chater-bom $argumentString"
+    $fullCommand = "chater-adapt $argumentString | chater-bom $argumentString"
 } else {
     $fullCommand = "chater-adapt | chater-bom"
 }
