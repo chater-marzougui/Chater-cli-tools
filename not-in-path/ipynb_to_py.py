@@ -9,18 +9,46 @@ import sys
 CODE_MARKER = '# CODE:'
 MD_MARKER = '# MD:'
 
+def load_notebook(ipynb_file):
+    """Load a Jupyter notebook from a .ipynb file."""
+    try:
+        with open(ipynb_file, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        print(f"Error: File '{ipynb_file}' not found.")
+        return None
+    except json.JSONDecodeError:
+        print(f"Error: '{ipynb_file}' is not a valid JSON file.")
+        return None
+
+
+def put_in_clipboard(txt_content):
+    try:
+        import pyperclip
+        pyperclip.copy(txt_content)
+        return " (also copied to clipboard)"
+    except ImportError:
+        return " (install 'pyperclip' to enable clipboard copy)"
+
+
+def get_content_as_string(source, cell_type):
+    
+    pad = '' if cell_type == 'code' else '#: '
+    if isinstance(source, list):
+        return pad.join(source)
+    
+    if cell_type == 'code':
+        return source
+    
+    lst = source.splitlines(keepends=True)
+    return ''.join([pad + line for line in lst])
+
 def ipynb_to_txt(ipynb_file, output_file=None):
     """Convert a .ipynb notebook to .txt file with structure markers."""
     
     # Read the notebook file
-    try:
-        with open(ipynb_file, 'r', encoding='utf-8') as f:
-            notebook = json.load(f)
-    except FileNotFoundError:
-        print(f"Error: File '{ipynb_file}' not found.")
-        return
-    except json.JSONDecodeError:
-        print(f"Error: '{ipynb_file}' is not a valid JSON file.")
+    notebook = load_notebook(ipynb_file)
+    if notebook is None:
         return
     
     # Extract cells
@@ -34,11 +62,8 @@ def ipynb_to_txt(ipynb_file, output_file=None):
         source = cell.get('source', [])
         
         # Convert source to string if it's a list
-        if isinstance(source, list):
-            content = ''.join(source)
-        else:
-            content = source
-        
+        content = get_content_as_string(source, cell_type)
+
         # Skip empty cells
         if not content.strip():
             continue
@@ -62,8 +87,8 @@ When generating a python code dedicated for Jupyter Notebook, structure your res
 
 For markdown cells, use:
 # MD: 
-Markdown content here
-Additional markdown explanations here.
+#: Markdown content here
+#: Additional markdown here.
 
 For code cells, use:
 # CODE:
@@ -71,6 +96,7 @@ your_code_here()
 additional_code_here()
 
 In both cases, ensure you return to line after the marker.
+Each line of markdown should start with #: to indicate it's part of the markdown cell.
 """
     
     txt_lines.append(prompt)
@@ -87,12 +113,7 @@ In both cases, ensure you return to line after the marker.
         f.write(txt_content)
         
     # Copy into clipboard (optional, requires pyperclip)
-    try:
-        import pyperclip
-        pyperclip.copy(txt_content)
-        clipboard_msg = " (also copied to clipboard)"
-    except ImportError:
-        clipboard_msg = ""
+    clipboard_msg = put_in_clipboard(txt_content)
     
     
     print(f"Successfully created '{output_file}'")

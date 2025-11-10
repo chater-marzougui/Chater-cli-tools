@@ -10,6 +10,7 @@ import sys
 
 CODE_MARKER = '# CODE:'
 MD_MARKER = '# MD:'
+EXACT_STRING = "When generating a python code dedicated for Jupyter Notebook, structure your response as follows:"
 
 def get_line_type(lines, index):
     """Determine if line is a marker for code or markdown."""
@@ -57,6 +58,13 @@ def parse_txt_to_cells(txt_content):
                 md_lines = []
             
         if i == len(lines): break
+
+        if content is not None and last_line_type == 'md' and '---' in content:
+            current_type, content = get_line_type(lines, i+1)
+            if content is not None and EXACT_STRING in content:
+                i += 15
+                continue
+            
         
         # Add content to appropriate buffer
         if current_type != None:
@@ -66,7 +74,7 @@ def parse_txt_to_cells(txt_content):
             if last_line_type == 'code':
                 code_lines.append(content)
             else:
-                md_lines.append(content)
+                md_lines.append(content.lstrip('#: ').rstrip())
         
         i += 1
     
