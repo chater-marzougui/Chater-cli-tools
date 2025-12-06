@@ -39,7 +39,7 @@ def parse_txt_to_cells(txt_content):
         current_type, content = get_line_type(lines, i)
         
         # Save accumulated lines when type changes or at end
-        if (current_type != last_line_type and current_type is not None) or i == len(lines):
+        if (current_type is not None) or i == len(lines):
             if last_line_type == 'code' and code_lines:
                 cells.append({
                     "cell_type": "code",
@@ -74,7 +74,10 @@ def parse_txt_to_cells(txt_content):
             if last_line_type == 'code':
                 code_lines.append(content)
             else:
-                md_lines.append(content.lstrip('#: ').rstrip())
+                if content.startswith('#: '):
+                    md_lines.append(content[3:])
+                else:
+                    md_lines.append(content)
         
         i += 1
     
@@ -132,4 +135,8 @@ if __name__ == "__main__":
         print(f"\nFormat: {MD_MARKER} for markdown, {CODE_MARKER} for code")
         sys.exit(1)
     
+    if sys.argv[1].endswith('.ipynb'):
+        print("Error: Input file must be a .txt or .py file.")
+        sys.exit(1)
+        
     txt_to_ipynb(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else None)

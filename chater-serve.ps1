@@ -56,6 +56,7 @@ function Show-Help {
     Write-Host "  --n         Alias for ngrok" -ForegroundColor $Colors.Success
     Write-Host "  serveo      Serveo - SSH tunneling" -ForegroundColor $Colors.Success
     Write-Host "  --serveo    Alias for serveo" -ForegroundColor $Colors.Success
+    Write-Host "  cf          Cloudflare Tunnel" -ForegroundColor $Colors.Success
     Write-Host ""
     Write-Host "FLAGS:" -ForegroundColor $Colors.Warning
     Write-Host "  -p, --port <port>      Specify port number" -ForegroundColor $Colors.Success
@@ -74,11 +75,12 @@ function Show-Help {
         Write-Host "  chater-serve --setup tunnel                # Setup LocalTunnel" -ForegroundColor $Colors.Success
         Write-Host ""
     }
-    Write-Host "REQUIREMENTS:" -ForegroundColor $Colors.Warning
+    Write-Host "REQUIREMENTS (You only need to install the ones you plan to use):" -ForegroundColor $Colors.Warning
     Write-Host "  🐍 Python:      Built-in with Windows/most systems" -ForegroundColor $Colors.Info
     Write-Host "  🚇 LocalTunnel: Node.js + npm install -g localtunnel" -ForegroundColor $Colors.Info
     Write-Host "  🔒 Ngrok:       Download from https://ngrok.com + auth token" -ForegroundColor $Colors.Info
     Write-Host "  📡 Serveo:      SSH client (built-in on most systems)" -ForegroundColor $Colors.Info
+    Write-Host "  ☁️ Cloudflare:  cloudflared from https://cloudflare.com" -ForegroundColor $Colors.Info
     Write-Host ""
 }
 
@@ -193,6 +195,25 @@ function Setup-Ngrok {
     }
 }
 
+function Setup-Cloudflare {
+    Write-Host "☁️ Setting up Cloudflared..." -ForegroundColor Cyan
+
+    if (Test-Command "cloudflared") {
+        Write-Host "✅ Cloudflared is already installed!" -ForegroundColor Green
+        return
+    }
+
+    Write-Host "📦 Installing Cloudflared..." -ForegroundColor Yellow
+
+    try {
+        Invoke-Expression "winget install --id Cloudflare.cloudflared"
+        Write-Host "✅ Cloudflared installed successfully!" -ForegroundColor Green
+    } catch {
+        Write-Host "❌ Failed to install cloudflared: $($_.Exception.Message)" -ForegroundColor Red
+    }
+}
+
+
 function Get-LocalIP {
     # Prefer Wi-Fi or Ethernet, ignore virtual adapters
     $adapter = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
@@ -250,12 +271,12 @@ function Start-LocalTunnel {
     param([string]$Port, [string]$Subdomain, [bool]$PrintRequests, [bool]$QR)
 
     if (-not (Test-Command "lt")) {
-        Write-Host "❌ LocalTunnel not found!" -ForegroundColor $Colors.Error
-        Write-Host "💡 Try running: chater-serve --setup tunnel" -ForegroundColor $Colors.Info
+        Write-Host "❌ LocalTunnel not found!" -ForegroundColor Red
+        Write-Host "💡 Try running: chater-serve --setup tunnel" -ForegroundColor Yellow
         return
     }
 
-    $tunnelArgs = @("lt", "--port", $Port)
+    $tunnelArgs = @("--port", $Port)
 
     if (-not [string]::IsNullOrEmpty($Subdomain)) {
         $tunnelArgs += @("--subdomain", $Subdomain)
@@ -265,51 +286,65 @@ function Start-LocalTunnel {
         $tunnelArgs += "--print-requests"
     }
     
-    Write-Host "🛑 Press Ctrl+C to stop" -ForegroundColor $Colors.Warning
+    Write-Host "🛑 Press Ctrl+C to stop" -ForegroundColor Yellow
     Write-Host ""
     
-    try {
-        if (Test-Path $STDOUTFile) { Remove-Item $STDOUTFile -Force }
-        if (Test-Path $STDERRFile) { Remove-Item $STDERRFile -Force }
-        $process = Start-Process "npx.cmd" -ArgumentList $tunnelArgs `
-        -RedirectStandardOutput $STDOUTFile -RedirectStandardError $STDERRFile `
-        -NoNewWindow -PassThru
-
-        # Wait until it outputs the public URL
-        $publicUrl = $null
-        $lastLineCount = 0
-        while (-not $process.HasExited) {
-            Start-Sleep -Milliseconds 100
-            if (Test-Path $STDOUTFile) {
-                $lines = Get-Content $STDOUTFile
-                if($lines -and $lines.GetType().Name -eq "String") {
-                    if ($lastLineCount -eq 1) {
-                        continue;
-                    }
-                    $lastLineCount = 1
-                    if ($lines -match "your url is: (https?://[^\s]+)") {
-                        $publicUrl = $matches[1]
-                        Write-Host "✅ LocalTunnel URL: $publicUrl" -ForegroundColor Green
-                        if ($QR) {
-                            Write-Host "📱 Generating QR code for: $publicUrl" -ForegroundColor Cyan
-                            & chater-qr $publicUrl
-                        }
-                    }
-                }
-                elseif ($lines) {
-                    $newLines = $lines[$lastLineCount..($lines.Count)]
-                    $lastLineCount = $lines.Count
-
-                    foreach ($line in $newLines) {
-                        Write-Host "[lt] $line" -ForegroundColor Green
-                    }
+    & npx.cmd lt @tunnelArgs 2>&1 | ForEach-Object {
+        $line = $_.ToString()
+        
+        # Parse LocalTunnel log format with date
+        if ($line -match '^\w+\s+\w+\s+\d+\s+\d{4}\s+(\d{2}:\d{2}:\d{2})\s+GMT[^\s]+\s+\([^\)]+\)\s+(\w+)\s+(.+)$') {
+            $time = $matches[1]
+            $method = $matches[2]
+            $path = $matches[3]
+            
+            # Print [lt] prefix in cyan
+            Write-Host "[lt] " -NoNewline -ForegroundColor Cyan
+            
+            # Print time in dark gray
+            Write-Host $time -NoNewline -ForegroundColor DarkGray
+            
+            # Print separator
+            Write-Host " | " -NoNewline -ForegroundColor DarkGray
+            
+            # Print method in green
+            Write-Host $method -NoNewline -ForegroundColor Green
+            Write-Host " " -NoNewline
+            
+            # Print path in white
+            Write-Host $path -ForegroundColor White
+        }
+        # Check for "your url is:" message
+        elseif ($line -match "your url is:\s*(https?://[^\s]+)") {
+            $publicUrl = $matches[1]
+            Write-Host ""
+            Write-Host "✅ LocalTunnel URL: " -NoNewline -ForegroundColor Cyan
+            Write-Host $publicUrl -ForegroundColor Green
+            Write-Host ""
+            
+            if ($QR) {
+                Write-Host "📱 Generating QR code for: $publicUrl" -ForegroundColor Cyan
+                & chater-qr $publicUrl
+            }
+        }
+        # Handle other messages
+        else {
+            Write-Host $line -ForegroundColor White
+            
+            # Still check for URL in case format changes
+            if ($line -match "(https?://[a-zA-Z0-9\-]+\.loca\.lt)") {
+                $publicUrl = $matches[1]
+                Write-Host ""
+                Write-Host "✅ LocalTunnel URL: " -NoNewline -ForegroundColor Cyan
+                Write-Host $publicUrl -ForegroundColor Green
+                Write-Host ""
+                
+                if ($QR) {
+                    Write-Host "📱 Generating QR code for: $publicUrl" -ForegroundColor Cyan
+                    & chater-qr $publicUrl
                 }
             }
         }
-    }
-    catch {
-        Write-Host "❌ Failed to start LocalTunnel: $($_.Exception.Message)" -ForegroundColor $Colors.Error
-        Write-Host "💡 Try running: chater-serve --setup tunnel" -ForegroundColor $Colors.Info
     }
 }
 
@@ -475,6 +510,125 @@ function Start-Serveo {
         } catch {}
     }
 }
+function Start-Cloudflare {
+    param([string]$Port, [string]$Domain, [bool]$QR)
+
+    if (-not (Test-Command "cloudflared")) {
+        Write-Host "❌ Cloudflared is not installed!" -ForegroundColor Red
+        Write-Host "💡 Run: chater-serve --setup cloudflare" -ForegroundColor Yellow
+        return
+    }
+
+    Write-Host "☁️ Starting Cloudflare Tunnel..." -ForegroundColor Cyan
+
+    $targetUrl = "localhost:$Port"
+    $tunnelArgs = @("tunnel", "--url", $targetUrl)
+
+    if ($Domain) {
+        Write-Host "⚠️ Note: Custom domains require CF account" -ForegroundColor Yellow
+        Write-Host "   Ignoring domain for quick tunnels." -ForegroundColor Yellow
+    }
+
+    & cloudflared @tunnelArgs 2>&1 | ForEach-Object {
+        $line = $_.ToString()
+        
+        # Parse cloudflared log format: YYYY-MM-DDTHH:MM:SSZ LEVEL message
+        if ($line -match '^(\d{4}-\d{2}-\d{2}T)?(\d{2}:\d{2}:\d{2})Z?\s+(INF|ERR|WRN)\s+(.+)$') {
+            $time = $matches[2]
+            $level = $matches[3]
+            $message = $matches[4]
+            
+            # Color the level
+            $levelColor = switch ($level) {
+                'INF' { 'Green' }
+                'ERR' { 'Red' }
+                default { 'Blue' }
+            }
+            
+            # Print time in dark gray
+            Write-Host $time -NoNewline -ForegroundColor DarkGray
+            Write-Host " " -NoNewline
+            
+            # Print level in appropriate color
+            Write-Host $level -NoNewline -ForegroundColor $levelColor
+            Write-Host " " -NoNewline
+            
+            # Wrap message at 100 chars
+            $maxWidth = 100
+            $remainingMessage = $message
+            $firstLine = $true
+            
+            while ($remainingMessage.Length -gt 0) {
+                if ($remainingMessage.Length -le $maxWidth) {
+                    Write-Host $remainingMessage -ForegroundColor White
+                    break
+                }
+                
+                # Find a good break point (space) before 100 chars
+                $breakPoint = $maxWidth
+                $lastSpace = $remainingMessage.Substring(0, $maxWidth).LastIndexOf(' ')
+                if ($lastSpace -gt 0) {
+                    $breakPoint = $lastSpace
+                }
+                
+                $chunk = $remainingMessage.Substring(0, $breakPoint)
+                $remainingMessage = $remainingMessage.Substring($breakPoint).TrimStart()
+                
+                if ($firstLine) {
+                    Write-Host $chunk -ForegroundColor White
+                    $firstLine = $false
+                } else {
+                    # Indent continuation lines
+                    Write-Host "           " -NoNewline
+                    Write-Host $chunk -ForegroundColor White
+                }
+            }
+            
+            # Check for URL in message
+            if ($message -match "(https?://[a-zA-Z0-9\-]+\.trycloudflare\.com)") {
+                $publicUrl = $matches[1]
+                Write-Host ""
+                Write-Host "🌐 Cloudflare URL: " -NoNewline -ForegroundColor Cyan
+                Write-Host $publicUrl -ForegroundColor Green
+                Write-Host ""
+                if ($QR) { & chater-qr $publicUrl }
+            }
+        }
+        else {
+            # Lines that don't match format - print as-is wrapped at 100 chars
+            $maxWidth = 100
+            $remainingLine = $line
+            
+            while ($remainingLine.Length -gt 0) {
+                if ($remainingLine.Length -le $maxWidth) {
+                    Write-Host $remainingLine -ForegroundColor White
+                    break
+                }
+                
+                $breakPoint = $maxWidth
+                $lastSpace = $remainingLine.Substring(0, $maxWidth).LastIndexOf(' ')
+                if ($lastSpace -gt 0) {
+                    $breakPoint = $lastSpace
+                }
+                
+                $chunk = $remainingLine.Substring(0, $breakPoint)
+                $remainingLine = $remainingLine.Substring($breakPoint).TrimStart()
+                
+                Write-Host $chunk -ForegroundColor White
+            }
+            
+            # Still check for URL in unformatted lines
+            if ($line -match "(https?://[a-zA-Z0-9\-]+\.trycloudflare\.com)") {
+                $publicUrl = $matches[1]
+                Write-Host ""
+                Write-Host "🌐 Cloudflare URL: " -NoNewline -ForegroundColor Cyan
+                Write-Host $publicUrl -ForegroundColor Green
+                Write-Host ""
+                if ($QR) { & chater-qr $publicUrl }
+            }
+        }
+    }
+}
 
 # Parse arguments function
 function ParseArguments {
@@ -504,7 +658,7 @@ function ParseArguments {
     $setupArgs = @("--s", "--setup", "-s", "-setup", "s", "setup")
     if ($Arguments.Where({ $_ -in $setupArgs }).Count -gt 0) {
         $result.IsSetup = $true
-        $possibleOptions = @("python", "tunnel", "ngrok", "--n", "--lt")
+        $possibleOptions = @("python", "tunnel", "ngrok", "--n", "--lt", "cf", "--cf", "-cf", "cloudflare")
         $result.SetupOption = ($Arguments | Where-Object { $_.ToLower() -in $possibleOptions })
         return $result
     }
@@ -528,11 +682,12 @@ function ParseArguments {
                 }
                 break
             }
-            '^(python|tunnel|-lt|--lt|ngrok|-n|--n|serveo|-serveo|--serveo)$' {
+            '^(python|tunnel|-lt|--lt|ngrok|-n|--n|serveo|-serveo|--serveo|cf|--cf|-cf|cloudflare)$' {
                 switch -Regex ($arg.ToLower()) {
                     "^(tunnel|-lt|--lt)" { $result.Option = "tunnel" }
                     "^(ngrok|-n|--n)" { $result.Option = "ngrok" }
                     "^(serveo|-serveo|--serveo)" { $result.Option = "serveo" }
+                    "^(cf|--cf|-cf|cloudflare)" { $result.Option = "cloudflare" }
                     default { $result.Option = "python" }
                 }
                 break
@@ -580,9 +735,10 @@ if ($parsed.IsSetup) {
         "python" { Setup-Python }
         { $_ -in @("tunnel", "--lt") } { Setup-LocalTunnel }
         { $_ -in @("ngrok", "--n") } { Setup-Ngrok }
+        { $_ -in @("cf", "--cf", "-cf", "cloudflare") } { Setup-Cloudflare }
         default {
             Write-Host "❌ Unknown setup option: $($parsed.SetupOption)" -ForegroundColor $Colors.Error
-            Write-Host "Available options: python, tunnel, ngrok" -ForegroundColor $Colors.Info
+            Write-Host "Available options: python, tunnel, ngrok, cloudflare" -ForegroundColor $Colors.Info
         }
     }
     return
@@ -632,9 +788,12 @@ switch ($parsed.Option) {
     "serveo" {
         Start-Serveo -Port $parsed.Port -Subdomain $parsed.Domain -QR $parsed.QR
     }
+    "cloudflare" {
+        Start-Cloudflare -Port $parsed.Port -Domain $parsed.Domain -QR $parsed.QR
+    }
     default {
         Write-Host "❌ Unknown option: $($parsed.Option)" -ForegroundColor $Colors.Error
-        Write-Host "Available options: python, tunnel, ngrok, serveo" -ForegroundColor $Colors.Info
+        Write-Host "Available options: python, tunnel, ngrok, serveo, cloudflare" -ForegroundColor $Colors.Info
         Write-Host "💡 Use 'chater-serve -h' for help" -ForegroundColor $Colors.Info
     }
 }
