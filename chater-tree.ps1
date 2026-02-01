@@ -12,7 +12,7 @@ $DefaultIgnored = @(
 
 # Patterns that should only match exact directory names (not paths)
 $ExactDirectoryMatches = @(
-    "bin", "obj", "packages", "dist", "build", "out", "target", "tmp", "temp", "logs"
+    "bin", "obj", "dist", "build", "out", "target", "tmp", "temp", "logs"
 )
 
 function Show-Help {
@@ -36,6 +36,7 @@ function Show-Help {
     Write-Host "  chater-tree -dirs                   # Show directories only" -ForegroundColor Green
     Write-Host "  chater-tree -ext <extensions>       # Filter by file extensions" -ForegroundColor Green
     Write-Host "  chater-tree -ignore <patterns>      # Additional ignore patterns" -ForegroundColor Green
+    Write-Host "  chater-tree -include <patterns>     # Forced include patterns" -ForegroundColor Green
     Write-Host "  chater-tree -all                    # Show all files (ignore default filters)" -ForegroundColor Green
     Write-Host "  chater-tree -size                   # Show file sizes" -ForegroundColor Green
     Write-Host "  chater-tree -h                      # Show this help message" -ForegroundColor Green
@@ -72,10 +73,18 @@ function Test-IgnoreItem {
         [bool]$IsDirectory,
         [string[]]$IgnorePatterns,
         [string[]]$ExactDirPatterns,
+        [string[]]$IncludePatterns,
         [bool]$ShowAll
     )
     
     if ($ShowAll) { return $false }
+    
+    # Check if item matches include patterns - if so, never ignore it
+    foreach ($pattern in $IncludePatterns) {
+        if ($ItemName -eq $pattern -or $ItemName -like "*$pattern*") {
+            return $false
+        }
+    }
     
     # Check against exact directory matches (only exact name matches)
     if ($IsDirectory) {
@@ -110,6 +119,7 @@ function Show-TreeStructure {
         [string[]]$Extensions,
         [string[]]$IgnorePatterns,
         [string[]]$ExactDirPatterns,
+        [string[]]$IncludePatterns,
         [bool]$ShowAll,
         [bool]$ShowSize,
         [string]$Prefix = "",
@@ -124,7 +134,7 @@ function Show-TreeStructure {
         
         foreach ($item in $items) {
             # Apply ignore filters
-            if (Test-IgnoreItem -ItemName $item.Name -ItemPath $item.FullName -IsDirectory $item.PSIsContainer -IgnorePatterns $IgnorePatterns -ExactDirPatterns $ExactDirPatterns -ShowAll $ShowAll) {
+            if (Test-IgnoreItem -ItemName $item.Name -ItemPath $item.FullName -IsDirectory $item.PSIsContainer -IgnorePatterns $IgnorePatterns -ExactDirPatterns $ExactDirPatterns -IncludePatterns $IncludePatterns -ShowAll $ShowAll) {
                 continue
             }
             
@@ -201,7 +211,7 @@ function Show-TreeStructure {
             
             # Recurse into directories
             if ($item.PSIsContainer -and ($MaxDepth -eq -1 -or $CurrentDepth + 1 -lt $MaxDepth)) {
-                Show-TreeStructure -RootPath $item.FullName -MaxDepth $MaxDepth -FilesOnly $FilesOnly -DirsOnly $DirsOnly -Extensions $Extensions -IgnorePatterns $IgnorePatterns -ExactDirPatterns $ExactDirPatterns -ShowAll $ShowAll -ShowSize $ShowSize -Prefix $nextPrefix -CurrentDepth ($CurrentDepth + 1)
+                Show-TreeStructure -RootPath $item.FullName -MaxDepth $MaxDepth -FilesOnly $FilesOnly -DirsOnly $DirsOnly -Extensions $Extensions -IgnorePatterns $IgnorePatterns -ExactDirPatterns $ExactDirPatterns -IncludePatterns $IncludePatterns -ShowAll $ShowAll -ShowSize $ShowSize -Prefix $nextPrefix -CurrentDepth ($CurrentDepth + 1)
             }
         }
     }
@@ -224,6 +234,7 @@ $FilesOnly = $false
 $DirsOnly = $false
 $Extensions = @()
 $AdditionalIgnore = @()
+$IncludePatterns = @()
 $ShowAll = $false
 $ShowSize = $false
 $Path = "."
@@ -264,6 +275,12 @@ for ($i = $StartFrom; $i -lt $Arguments.Count; $i++) {
                 $i++
             }
         }
+        "-include" {
+            if ($i + 1 -lt $Arguments.Count) {
+                $IncludePatterns = $Arguments[$i + 1].Split(',') | ForEach-Object { $_.Trim() }
+                $i++
+            }
+        }
         "-all" { $ShowAll = $true }
         "-size" { $ShowSize = $true }
         "-s" { $ShowSize = $true }
@@ -299,7 +316,7 @@ if (-not $pathInfo.PSIsContainer) {
 }
 
 # Show tree structure
-Show-TreeStructure -RootPath $resolvedPath -MaxDepth $MaxDepth -FilesOnly $FilesOnly -DirsOnly $DirsOnly -Extensions $Extensions -IgnorePatterns ($DefaultIgnored + $AdditionalIgnore) -ExactDirPatterns $ExactDirectoryMatches -ShowAll $ShowAll -ShowSize $ShowSize
+Show-TreeStructure -RootPath $resolvedPath -MaxDepth $MaxDepth -FilesOnly $FilesOnly -DirsOnly $DirsOnly -Extensions $Extensions -IgnorePatterns ($DefaultIgnored + $AdditionalIgnore) -ExactDirPatterns $ExactDirectoryMatches -IncludePatterns $IncludePatterns -ShowAll $ShowAll -ShowSize $ShowSize
 
 Write-Host ""
 

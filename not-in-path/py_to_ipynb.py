@@ -60,8 +60,8 @@ def parse_txt_to_cells(txt_content):
         if i == len(lines): break
 
         if content is not None and last_line_type == 'md' and '---' in content:
-            current_type, content = get_line_type(lines, i+1)
-            if content is not None and EXACT_STRING in content:
+            _, next_content = get_line_type(lines, i+1)
+            if next_content is not None and EXACT_STRING in next_content:
                 i += 15
                 continue
             
